@@ -12,6 +12,22 @@ import { useCanvasStore } from "@/lib/store";
 
 export function CardArtifactPreview({ card }: { card: Card }) {
   const sessionArtifacts = useCanvasStore((s) => s.sessionArtifacts);
+  const canvasArtifactNodes = useCanvasStore((s) => s.canvasArtifactNodes);
+
+  // R7d — suppress the in-card preview pill when the artifact is already
+  // visible as a standalone CanvasArtifactNode on the canvas. The pill is
+  // redundant in that case AND its 70–90 px height was pushing follow-up
+  // cards way below the parent. Keep the pill while the card is still
+  // streaming / thinking so the user gets generation feedback inline.
+  const generating =
+    card.status === "streaming" || card.status === "thinking";
+  if (card.outputArtifactId && !generating) {
+    const hasCanvasNode = Object.values(canvasArtifactNodes).some(
+      (n) => n.artifactId === card.outputArtifactId,
+    );
+    if (hasCanvasNode) return null;
+  }
+
   if (card.outputArtifactId) {
     const art = sessionArtifacts[card.outputArtifactId];
     if (!art) return null;

@@ -137,3 +137,73 @@ export function pointInRect(
     world.y <= rect.y + rect.h
   );
 }
+
+// ---------------------------------------------------------------------------
+// R5b — detect which existing component the pointer is over (for drag-to-connect)
+// ---------------------------------------------------------------------------
+
+export interface ComponentHit {
+  componentId: string;
+  visualKind: "card" | "artifact";
+  /** Which edge of the rect is closest to the pointer at drop time. */
+  side: "top" | "bottom" | "left" | "right";
+}
+
+/**
+ * Returns the topmost canvas component element under the given client coords,
+ * or null if the pointer isn't over any. Walks the DOM from the hit element
+ * upward looking for `[data-canvas-card]` or `[data-canvas-artifact]`. Uses
+ * the bounding rect to decide which edge is closest.
+ *
+ * Works regardless of viewport pan/zoom because elementFromPoint sees the
+ * actual painted geometry.
+ */
+export function findComponentTargetAtPoint(
+  clientX: number,
+  clientY: number,
+): ComponentHit | null {
+  if (typeof document === "undefined") return null;
+  let el = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+  while (el) {
+    const cardId = el.dataset?.canvasCard;
+    if (cardId) {
+      return {
+        componentId: cardId,
+        visualKind: "card",
+        side: nearestEdge(el.getBoundingClientRect(), clientX, clientY),
+      };
+    }
+    const artifactId = el.dataset?.canvasArtifact;
+    if (artifactId) {
+      return {
+        componentId: artifactId,
+        visualKind: "artifact",
+        side: nearestEdge(el.getBoundingClientRect(), clientX, clientY),
+      };
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
+
+function nearestEdge(
+  rect: DOMRect,
+  clientX: number,
+  clientY: number,
+): "top" | "bottom" | "left" | "right" {
+  const distances = {
+    top: clientY - rect.top,
+    bottom: rect.bottom - clientY,
+    left: clientX - rect.left,
+    right: rect.right - clientX,
+  };
+  let nearest: "top" | "bottom" | "left" | "right" = "top";
+  let best = Infinity;
+  for (const [side, d] of Object.entries(distances)) {
+    if (d < best) {
+      best = d;
+      nearest = side as typeof nearest;
+    }
+  }
+  return nearest;
+}

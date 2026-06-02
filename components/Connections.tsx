@@ -20,6 +20,8 @@ import { buildPlugConnectorPath, plugAnchorAt } from "@/lib/plugConnector";
 
 import { compensatedStrokeWidth } from "@/lib/zoomDisplay";
 
+import { useV2ConnectionsStore } from "@/lib/v2ConnectionsStore";
+
 
 
 const STROKE_FALLBACK = "#B8B5AE";
@@ -228,6 +230,9 @@ export function Connections() {
 
   const connections = useCanvasStore((s) => s.connections);
 
+  // R6a — skip connections that V2Connections.tsx renders with mode styling.
+  const v2Mirrored = useV2ConnectionsStore((s) => s.connections);
+
   const threads = useCanvasStore((s) => s.threads);
 
   const viewport = useCanvasStore((s) => s.viewport);
@@ -318,7 +323,7 @@ export function Connections() {
 
       <svg
 
-        className="absolute left-0 top-0"
+        className="absolute left-0 top-0 z-[10]"
 
         style={{ overflow: "visible" }}
 
@@ -329,6 +334,11 @@ export function Connections() {
       >
 
         {connections.map((conn) => {
+
+          // R6a — skip manual connections; V2Connections.tsx renders those
+          // with mode-specific styling (REGEN badge / dashed line / accent).
+          if (v2Mirrored[conn.id]) return null;
+
 
           const from = cards[conn.from];
 

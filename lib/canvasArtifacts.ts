@@ -1,13 +1,21 @@
 import { getLatestVersion, getVersionById } from "@/lib/sessionArtifacts";
-import { CARD_WIDTH, getArtifactBounds } from "@/lib/canvasNodeBounds";
 import {
-  ARTIFACT_SPAWN_GAP_X,
+  CARD_WIDTH,
+  DEFAULT_ARTIFACT_HEIGHT,
+  getArtifactBounds,
+} from "@/lib/canvasNodeBounds";
+import {
   CANVAS_ARTIFACT_WIDTH,
   useCanvasStore,
   type CanvasArtifactNode,
   type Card,
 } from "@/lib/store";
 import { viewportCenteredOnWorldPoint } from "@/lib/viewport";
+import {
+  buildOccupants,
+  cardAsOccupant,
+  computePlacement,
+} from "@/lib/canvas/placement";
 
 export function findCanvasNodeByArtifactId(
   nodes: Record<string, CanvasArtifactNode>,
@@ -16,28 +24,39 @@ export function findCanvasNodeByArtifactId(
   return Object.values(nodes).find((n) => n.artifactId === artifactId);
 }
 
+/**
+ * R7b — Thin wrapper around the unified `computePlacement`.
+ *
+ * Keeps the legacy signature so existing callers (`store.ts:spawnCanvasArtifact`,
+ * etc.) don't have to change. Internally routes to the unified placement
+ * service so artifact placement participates in the same AABB grid as
+ * follow-ups and branches.
+ */
 export function computeDefaultSpawnPosition(
   sourceCardId: string,
   nodes: Record<string, CanvasArtifactNode>,
   cards: Record<string, Card>,
+  bounds: { w: number; h: number } = {
+    w: CANVAS_ARTIFACT_WIDTH,
+    h: DEFAULT_ARTIFACT_HEIGHT,
+  },
 ): { x: number; y: number } {
   const card = cards[sourceCardId];
-  if (!card) {
-    return { x: CANVAS_ARTIFACT_WIDTH + ARTIFACT_SPAWN_GAP_X, y: 0 };
-  }
-
-  const cardW = card.size?.w ?? CARD_WIDTH;
-  let x = card.position.x + cardW + ARTIFACT_SPAWN_GAP_X;
-  let y = card.position.y;
-
-  const overlap = Object.values(nodes).filter(
-    (n) => Math.abs(n.position.y - y) < 40 && Math.abs(n.position.x - x) < 40,
-  );
-  if (overlap.length > 0) {
-    y += overlap.length * 40;
-  }
-
-  return { x, y };
+  const source = card
+    ? {
+        id: card.id,
+        position: card.position,
+        size: cardAsOccupant(card).size,
+      }
+    : null;
+  const occupants = buildOccupants(cards, nodes);
+  const { position } = computePlacement({
+    reason: "auto",
+    bounds,
+    source,
+    occupants,
+  });
+  return position;
 }
 
 /** Pan viewport to a canvas artifact node and select it. */

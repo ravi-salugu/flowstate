@@ -27,10 +27,13 @@ import {
 } from "@/components/CanvasContextMenu";
 import { CanvasLanding } from "@/components/CanvasLanding";
 import { CanvasViewport } from "@/components/CanvasViewport";
-import { CanvasArtifactNode } from "@/components/CanvasArtifactNode";
 import { CanvasTextLabelNode } from "@/components/CanvasTextLabelNode";
-import { Card } from "@/components/Card";
+import { ComponentRenderer } from "@/components/ComponentRenderer";
 import { Connections } from "@/components/Connections";
+import { V2Connections } from "@/components/V2Connections";
+import { V2ConnectDropManager } from "@/components/V2ConnectDropManager";
+import { useUnifiedComponents } from "@/lib/components/projection";
+import { installParityHelper } from "@/lib/canvasV2Parity";
 import { PlugConnectorLayer } from "@/components/plugs/PlugConnectorLayer";
 import { usePlugDragSession } from "@/hooks/usePlugDragSession";
 import { focusCanvasArtifact } from "@/lib/canvasArtifacts";
@@ -92,6 +95,12 @@ export function Canvas() {
   const groups = useCanvasStore((s) => s.groups);
   const groupList = Object.values(groups);
 
+  // R4c — unified component projection. Iteration source for the render loop
+  // below. Underlying slice subscriptions stay because the rest of Canvas
+  // (selection, marquee, drag, focus) still reads cards / canvasArtifactNodes
+  // directly. Those mutations naturally re-derive the projection.
+  const { components, componentOrder } = useUnifiedComponents();
+
   const showLanding = shouldShowCanvasLanding(cards, cardOrder);
   const landingCardId = getLandingCardId(cards, cardOrder);
 
@@ -102,6 +111,12 @@ export function Canvas() {
   useEffect(() => {
     if (cardOrder.length === 0) seedingRef.current = false;
   }, [cardOrder.length]);
+
+  // R8b — expose `window.__verifyV1V2Parity()` for console-driven parity checks
+  // during the v2 cut-over verification window. No-op in production.
+  useEffect(() => {
+    installParityHelper();
+  }, []);
 
   usePlugDragSession(containerRef);
   const panState = useRef<{ pointerId: number; lastX: number; lastY: number } | null>(
@@ -740,15 +755,11 @@ export function Canvas() {
         {groupList.map((group) => (
           <GroupBounds key={group.id} group={group} />
         ))}
-        {cardOrder.map((id) => {
-          const card = cards[id];
-          if (!card) return null;
-          return <Card key={id} card={card} />;
-        })}
-        {canvasArtifactOrder.map((id) => {
-          const node = canvasArtifactNodes[id];
-          if (!node) return null;
-          return <CanvasArtifactNode key={id} node={node} />;
+        {/* R4c — unified render via ComponentRenderer dispatch on kind */}
+        {componentOrder.map((id) => {
+          const component = components[id];
+          if (!component) return null;
+          return <ComponentRenderer key={id} component={component} />;
         })}
         {canvasTextLabelOrder.map((id) => {
           const label = canvasTextLabels[id];
@@ -767,9 +778,13 @@ export function Canvas() {
           ) : null,
         )}
         <Connections />
+        {/* R5c — manual v2 connections drawn from local store, atop v1 connections */}
+        <V2Connections />
         {placement && <GhostCard world={placement} />}
         {textPlacement && <GhostTextLabel world={textPlacement} />}
       </CanvasViewport>
+      {/* R5c — registers the connect-drop handler and renders the mode modal */}
+      <V2ConnectDropManager />
       {showLanding && !placement && landingCardId && (
         <div
           className="absolute left-0 top-0 z-40 origin-top-left will-change-transform"

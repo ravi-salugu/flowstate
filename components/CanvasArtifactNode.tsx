@@ -18,6 +18,8 @@ import { ArtifactShell } from "@/components/artifacts/ArtifactShell";
 
 import { Plug } from "@/components/plugs/Plug";
 
+import { useConnectDragHoverStore } from "@/lib/connectDragHoverStore";
+
 import { getArtifactBounds } from "@/lib/canvasNodeBounds";
 
 import { plugAnchorAt } from "@/lib/plugConnector";
@@ -59,6 +61,14 @@ export function CanvasArtifactNode({ node }: CanvasArtifactNodeProps) {
   const threads = useCanvasStore((s) => s.threads);
 
   const scale = useCanvasStore((s) => s.viewport.scale);
+
+  const plugDrag = useCanvasStore((s) => s.plugDrag);
+
+  // R7+ — true when a plug is being dragged AND this artifact is the
+  // current hover target, so we can paint a connect-mode ring.
+  const isDropTarget = useConnectDragHoverStore(
+    (s) => s.hoverComponentId === node.id,
+  );
 
   const selectedCanvasArtifactId = useCanvasStore(
 
@@ -318,7 +328,7 @@ export function CanvasArtifactNode({ node }: CanvasArtifactNodeProps) {
 
       ref={nodeRef}
 
-      data-canvas-artifact
+      data-canvas-artifact={node.id}
 
       onPointerDown={handlePointerDown}
 
@@ -352,7 +362,13 @@ export function CanvasArtifactNode({ node }: CanvasArtifactNodeProps) {
 
         <>
 
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-30 opacity-0 transition-opacity group-hover/artifact:opacity-100 [&_button]:pointer-events-auto">
+          <div
+            className={`pointer-events-none absolute inset-y-0 left-0 z-30 transition-opacity [&_button]:pointer-events-auto ${
+              plugDrag
+                ? "opacity-100"
+                : "opacity-0 group-hover/artifact:opacity-100"
+            }`}
+          >
 
             <Plug
 
@@ -370,7 +386,13 @@ export function CanvasArtifactNode({ node }: CanvasArtifactNodeProps) {
 
           </div>
 
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-30 opacity-0 transition-opacity group-hover/artifact:opacity-100 [&_button]:pointer-events-auto">
+          <div
+            className={`pointer-events-none absolute inset-y-0 right-0 z-30 transition-opacity [&_button]:pointer-events-auto ${
+              plugDrag
+                ? "opacity-100"
+                : "opacity-0 group-hover/artifact:opacity-100"
+            }`}
+          >
 
             <Plug
 
@@ -396,7 +418,11 @@ export function CanvasArtifactNode({ node }: CanvasArtifactNodeProps) {
 
         className={`rounded-artifact-card border bg-canvas-card p-5 shadow-card transition-shadow hover:shadow-cardHover ${
 
-          isSelected
+          isDropTarget
+
+            ? "border-emerald-500 ring-4 ring-emerald-400/40"
+
+            : isSelected
 
             ? "border-canvas-ink ring-2 ring-canvas-ink/25"
 

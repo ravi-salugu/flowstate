@@ -55,9 +55,10 @@ export function CardQaMenu({ cardId, viewportScale }: CardQaMenuProps) {
     };
   }, [open]);
 
-  if (!card || card.status === "empty") return null;
+  if (!card) return null;
 
   const canBranch = card.status === "done";
+  const isEmpty = card.status === "empty";
   const counterScale =
     viewportScale != null ? counterScaleFactor(viewportScale) : 1;
 
@@ -97,19 +98,21 @@ export function CardQaMenu({ cardId, viewportScale }: CardQaMenuProps) {
           className="absolute right-0 top-full z-50 mt-1 min-w-[200px] overflow-hidden rounded-lg border border-canvas-border bg-canvas-card py-1 shadow-card"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <ContextMenuItem
-            icon={<BranchForkIcon />}
-            label="Pull branch"
-            disabled={!canBranch}
-            onClick={() => {
-              if (!canBranch) return;
-              createBranch(cardId, "left");
-              setOpen(false);
-            }}
-          />
+          {!isEmpty && (
+            <ContextMenuItem
+              icon={<BranchForkIcon />}
+              label="Pull branch"
+              disabled={!canBranch}
+              onClick={() => {
+                if (!canBranch) return;
+                createBranch(cardId, "left");
+                setOpen(false);
+              }}
+            />
+          )}
           <ContextMenuItem
             icon={<TrashIcon />}
-            label="Delete from below"
+            label={isEmpty ? "Delete card" : "Delete from below"}
             onClick={() => {
               deleteFromCard(cardId);
               setOpen(false);

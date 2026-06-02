@@ -16,6 +16,7 @@ import {
   QaTranslucentSurface,
 } from "@/components/QaQuestionSection";
 import { askClaude } from "@/lib/claudeClient";
+import { useConnectDragHoverStore } from "@/lib/connectDragHoverStore";
 import {
   handleArtifactOnDone,
   handleStreamArtifact,
@@ -63,6 +64,12 @@ export function Card({ card }: CardProps) {
   const createFollowUp = useCanvasStore((s) => s.createFollowUp);
   const startPlugDrag = useCanvasStore((s) => s.startPlugDrag);
   const plugDrag = useCanvasStore((s) => s.plugDrag);
+  // R7+ — true when a plug is being dragged AND this card is the current
+  // hover target. Used to render a connect-mode ring so the user can see
+  // which card will receive the connection BEFORE releasing the pointer.
+  const isDropTarget = useConnectDragHoverStore(
+    (s) => s.hoverComponentId === card.id,
+  );
   const moveSubtree = useCanvasStore((s) => s.moveSubtree);
   const selectedModel = useCanvasStore((s) => s.selectedModel);
   const isSelected = useCanvasStore((s) =>
@@ -322,7 +329,13 @@ export function Card({ card }: CardProps) {
     >
       {showBranchPlugs && (
         <>
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-30 opacity-0 transition-opacity group-hover/card:opacity-100 [&_button]:pointer-events-auto">
+          <div
+            className={`pointer-events-none absolute inset-y-0 left-0 z-30 transition-opacity [&_button]:pointer-events-auto ${
+              plugDrag
+                ? "opacity-100"
+                : "opacity-0 group-hover/card:opacity-100"
+            }`}
+          >
             <Plug
               side="left"
               accentColour={plugAccent}
@@ -331,7 +344,13 @@ export function Card({ card }: CardProps) {
               onPointerDown={handleBranchPlugPointerDown("left")}
             />
           </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-30 opacity-0 transition-opacity group-hover/card:opacity-100 [&_button]:pointer-events-auto">
+          <div
+            className={`pointer-events-none absolute inset-y-0 right-0 z-30 transition-opacity [&_button]:pointer-events-auto ${
+              plugDrag
+                ? "opacity-100"
+                : "opacity-0 group-hover/card:opacity-100"
+            }`}
+          >
             <Plug
               side="right"
               accentColour={plugAccent}
@@ -344,20 +363,20 @@ export function Card({ card }: CardProps) {
       )}
       <div
         className={`group/inner relative flex flex-col overflow-hidden rounded-2xl border bg-transparent shadow-card transition-shadow hover:shadow-cardHover ${
-          isSelected
-            ? "border-canvas-ink ring-2 ring-canvas-ink/25"
-            : "border-canvas-border"
+          isDropTarget
+            ? "border-emerald-500 ring-4 ring-emerald-400/40"
+            : isSelected
+              ? "border-canvas-ink ring-2 ring-canvas-ink/25"
+              : "border-canvas-border"
         }`}
         style={{
           borderWidth: cardBorderWidth,
-          ...(isSelected && accent
+          ...(isSelected && accent && !isDropTarget
             ? { boxShadow: `0 0 0 2px ${accent}40` }
             : {}),
         }}
       >
-        {card.status !== "empty" && (
-          <CardQaMenu cardId={card.id} viewportScale={scale} />
-        )}
+        <CardQaMenu cardId={card.id} viewportScale={scale} />
         <div
           className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
             expandedContent ? "max-h-[var(--card-qa-max-height)]" : ""

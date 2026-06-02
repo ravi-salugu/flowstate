@@ -10,6 +10,13 @@
  */
 import { CARD_WIDTH, type CardBoundsInput } from "@/lib/canvasNodeBounds";
 import { getLayoutCardBounds } from "@/lib/canvasMeasure";
+import {
+  artifactNodeAsOccupant,
+  cardAsOccupant,
+  computePlacement,
+  FOLLOW_UP_GAP as UNIFIED_FOLLOW_UP_GAP,
+  type PlacementOccupant,
+} from "@/lib/canvas/placement";
 
 /** Layout graph types (structurally compatible with store Card / Connection). */
 export interface LayoutCard extends CardBoundsInput {
@@ -25,7 +32,14 @@ export interface LayoutConnection {
   toSide?: "top" | "bottom" | "left" | "right" | null;
 }
 
-export const FOLLOW_UP_GAP = 40;
+/** Minimal artifact-node shape used for AABB collision. */
+export interface LayoutArtifactNode {
+  id: string;
+  position: { x: number; y: number };
+  size?: { w?: number; h?: number };
+}
+
+export const FOLLOW_UP_GAP = UNIFIED_FOLLOW_UP_GAP;
 export const BRANCH_CARD_WIDTH = CARD_WIDTH;
 export const BRANCH_HORIZONTAL_GAP = BRANCH_CARD_WIDTH;
 export const COLUMN_STEP = CARD_WIDTH + BRANCH_HORIZONTAL_GAP;
@@ -34,6 +48,9 @@ export interface CanvasLayoutState {
   cards: Record<string, LayoutCard>;
   connections: LayoutConnection[];
   cardOrder: string[];
+  /** R7c — optional. When provided, follow-up placement also AABB-checks
+   *  against artifact nodes so they never collide. */
+  canvasArtifactNodes?: Record<string, LayoutArtifactNode>;
 }
 
 function collectSubtreeIds(
@@ -140,11 +157,38 @@ export function computeFollowUpPosition(
   parentId: string,
   parent: LayoutCard,
 ): { x: number; y: number } {
-  const { h: parentH } = getLayoutCardBounds(parent);
-  return {
-    x: parent.position.x,
-    y: parent.position.y + parentH + FOLLOW_UP_GAP,
-  };
+  // R7c — route through the unified placement service so the follow-up
+  // AABB-checks against artifacts to the right of the parent as well as
+  // siblings in the vertical chain. Preferred anchor is still
+  // (parent.x, parent.y + parentHeight + FOLLOW_UP_GAP) — the documented
+  // vertical-chain invariant — but the service will lane-walk down if that
+  // slot is occupied by another node.
+  const { w: parentW, h: parentH } = getLayoutCardBounds(parent);
+
+  const occupants: PlacementOccupant[] = [];
+  for (const c of Object.values(state.cards)) {
+    if (c.id === parentId) continue; // don't collide against self
+    occupants.push(cardAsOccupant(c));
+  }
+  if (state.canvasArtifactNodes) {
+    for (const n of Object.values(state.canvasArtifactNodes)) {
+      occupants.push(artifactNodeAsOccupant(n));
+    }
+  }
+
+  // Bounds for the new follow-up card — use the v1 default before measurement.
+  const newCardBounds = { w: CARD_WIDTH, h: 88 }; // EMPTY_CARD_HEIGHT
+  const { position } = computePlacement({
+    reason: "follow-up",
+    bounds: newCardBounds,
+    source: {
+      id: parentId,
+      position: parent.position,
+      size: { w: parentW, h: parentH },
+    },
+    occupants,
+  });
+  return position;
 }
 
 /** Recompute Y (and X) for an entire bottom-connected chain under `startParentId`. */

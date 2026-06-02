@@ -392,11 +392,13 @@ function layoutStateFrom(state: CanvasState): {
   cards: Record<string, Card>;
   connections: Connection[];
   cardOrder: string[];
+  canvasArtifactNodes: Record<string, CanvasArtifactNode>;
 } {
   return {
     cards: state.cards,
     connections: state.connections,
     cardOrder: state.cardOrder,
+    canvasArtifactNodes: state.canvasArtifactNodes,
   };
 }
 
@@ -852,17 +854,20 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
       const id = newCanvasArtifactNodeId();
       nodeId = id;
+      // Determine the artifact's bounds first so the placer can do real
+      // AABB collision checks with the actual size (tables are wider).
+      const artifactSize =
+        art.kind === "table"
+          ? { w: CANVAS_TABLE_ARTIFACT_WIDTH, h: TABLE_ARTIFACT_HEIGHT }
+          : { w: CANVAS_ARTIFACT_WIDTH, h: DEFAULT_ARTIFACT_HEIGHT };
       const position =
         opts?.position ??
         computeDefaultSpawnPosition(
           ver.sourceCardId,
           state.canvasArtifactNodes,
           state.cards,
+          artifactSize,
         );
-      const artifactSize =
-        art.kind === "table"
-          ? { w: CANVAS_TABLE_ARTIFACT_WIDTH, h: TABLE_ARTIFACT_HEIGHT }
-          : { w: CANVAS_ARTIFACT_WIDTH, h: DEFAULT_ARTIFACT_HEIGHT };
       const node: CanvasArtifactNode = {
         id,
         artifactId,
