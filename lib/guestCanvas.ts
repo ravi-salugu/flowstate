@@ -10,10 +10,19 @@ const GUEST_STASH_KEY = "flowstate:guest-adopt";
 /** Ignore a stash older than this — a stale draft shouldn't ambush a later login. */
 const GUEST_STASH_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
+/** Where a guest's canvas came from, when it started as a published canvas. */
+export interface GuestCanvasLineage {
+  sourceCanvasId?: string;
+  sourcePublishedSlug?: string;
+  sourcePublishedVersion?: number;
+}
+
 type GuestStash = {
   snapshot: CanvasSnapshot;
   title: string;
   at: number;
+  /** Optional, so stashes written before publishing existed still parse. */
+  lineage?: GuestCanvasLineage;
 };
 
 /** True when the snapshot holds anything worth saving (not a blank canvas). */
@@ -39,18 +48,26 @@ export function snapshotHasContent(
   );
 }
 
-export function stashGuestCanvas(snapshot: CanvasSnapshot, title: string): void {
+export function stashGuestCanvas(
+  snapshot: CanvasSnapshot,
+  title: string,
+  lineage?: GuestCanvasLineage,
+): void {
   if (typeof window === "undefined") return;
   if (!snapshotHasContent(snapshot)) return;
   try {
-    const payload: GuestStash = { snapshot, title, at: Date.now() };
+    const payload: GuestStash = { snapshot, title, at: Date.now(), lineage };
     window.localStorage.setItem(GUEST_STASH_KEY, JSON.stringify(payload));
   } catch {
     // Storage full / disabled — adoption is best-effort, don't block sign-in.
   }
 }
 
-export function readGuestCanvasStash(): { snapshot: CanvasSnapshot; title: string } | null {
+export function readGuestCanvasStash(): {
+  snapshot: CanvasSnapshot;
+  title: string;
+  lineage?: GuestCanvasLineage;
+} | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(GUEST_STASH_KEY);
@@ -61,7 +78,11 @@ export function readGuestCanvasStash(): { snapshot: CanvasSnapshot; title: strin
       clearGuestCanvasStash();
       return null;
     }
-    return { snapshot: parsed.snapshot, title: parsed.title || "My canvas" };
+    return {
+      snapshot: parsed.snapshot,
+      title: parsed.title || "My canvas",
+      lineage: parsed.lineage,
+    };
   } catch {
     return null;
   }

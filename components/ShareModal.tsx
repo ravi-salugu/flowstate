@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { PublishPanel } from "@/components/published/PublishPanel";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
@@ -36,6 +37,7 @@ export function ShareModal() {
     leaveCanvas,
     duplicateActiveCanvas,
     switchCanvas,
+    activeCanvasId,
     user,
     onlineUserIds,
   } = useAuth();
@@ -45,6 +47,7 @@ export function ShareModal() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [tab, setTab] = useState<"people" | "publish">("people");
 
   const isOwner = isCanvasOwner(activeCanvasRole);
   const memberCount = members.length;
@@ -123,6 +126,30 @@ export function ShareModal() {
           <CloseButton onClick={close} />
         </div>
 
+
+        {isOwner && (
+          <div className="mb-4 flex gap-1 rounded-canvas border border-canvas-border bg-canvas-bg p-1">
+            {(["people", "publish"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={`flex-1 rounded-canvas px-3 py-1.5 text-canvas-body-sm font-medium transition ${
+                  tab === t
+                    ? "bg-canvas-card text-canvas-ink shadow-card"
+                    : "text-canvas-muted hover:text-canvas-ink"
+                }`}
+              >
+                {t === "people" ? "People" : "Publish to web"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isOwner && tab === "publish" ? (
+          <PublishPanel canvasId={activeCanvasId} />
+        ) : (
+          <>
         {isOwner && (
           <>
             <div className="mb-4 space-y-2">
@@ -255,6 +282,8 @@ export function ShareModal() {
             </Button>
           )}
         </div>
+          </>
+        )}
         </MotionFlowSize>
       </div>
           </MotionOverlayModal>

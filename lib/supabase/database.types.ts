@@ -49,6 +49,9 @@ export interface Database {
           updated_at: string;
           content_edited_at: string | null;
           thumbnail_url: string | null;
+          source_canvas_id: string | null;
+          source_published_slug: string | null;
+          source_published_version: number | null;
         };
         Insert: {
           id?: string;
@@ -62,6 +65,9 @@ export interface Database {
           updated_at?: string;
           content_edited_at?: string | null;
           thumbnail_url?: string | null;
+          source_canvas_id?: string | null;
+          source_published_slug?: string | null;
+          source_published_version?: number | null;
         };
         Update: {
           id?: string;
@@ -75,6 +81,9 @@ export interface Database {
           updated_at?: string;
           content_edited_at?: string | null;
           thumbnail_url?: string | null;
+          source_canvas_id?: string | null;
+          source_published_slug?: string | null;
+          source_published_version?: number | null;
         };
         Relationships: [
           {
@@ -749,6 +758,86 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["guest_credit_counters"]["Insert"]>;
         Relationships: [];
       };
+      published_canvases: {
+        Row: {
+          id: string;
+          slug: string;
+          source_canvas_id: string;
+          owner_id: string;
+          owner_display_name: string | null;
+          owner_avatar_url: string | null;
+          title: string;
+          description: string | null;
+          og_image_url: string | null;
+          current_version: number;
+          visibility: "unlisted" | "public" | "revoked";
+          featured_at: string | null;
+          view_count: number;
+          copy_count: number;
+          published_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          source_canvas_id: string;
+          owner_id: string;
+          owner_display_name?: string | null;
+          owner_avatar_url?: string | null;
+          title: string;
+          description?: string | null;
+          og_image_url?: string | null;
+          current_version?: number;
+          visibility?: "unlisted" | "public" | "revoked";
+          featured_at?: string | null;
+          view_count?: number;
+          copy_count?: number;
+          published_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["published_canvases"]["Insert"]>;
+        Relationships: [];
+      };
+      published_canvas_versions: {
+        Row: {
+          id: string;
+          published_canvas_id: string;
+          version: number;
+          state: Json;
+          snapshot_version: number;
+          byte_size: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          published_canvas_id: string;
+          version: number;
+          state: Json;
+          snapshot_version?: number;
+          byte_size?: number;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["published_canvas_versions"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      published_canvas_views: {
+        Row: {
+          published_canvas_id: string;
+          visitor_id: string;
+          day: string;
+        };
+        Insert: {
+          published_canvas_id: string;
+          visitor_id: string;
+          day?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["published_canvas_views"]["Insert"]
+        >;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -770,6 +859,33 @@ export interface Database {
       };
       process_pending_canvas_invites: {
         Args: Record<string, never>;
+        Returns: undefined;
+      };
+      get_published_canvas_meta: {
+        Args: { p_slug: string };
+        Returns: {
+          id: string;
+          slug: string;
+          title: string;
+          description: string | null;
+          owner_display_name: string | null;
+          owner_avatar_url: string | null;
+          og_image_url: string | null;
+          current_version: number;
+          published_at: string;
+          updated_at: string;
+        }[];
+      };
+      get_published_canvas_state: {
+        Args: { p_slug: string; p_version: number };
+        Returns: Json | null;
+      };
+      record_published_canvas_copy: {
+        Args: { p_slug: string };
+        Returns: undefined;
+      };
+      increment_published_view: {
+        Args: { p_published_canvas_id: string };
         Returns: undefined;
       };
     };

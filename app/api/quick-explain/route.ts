@@ -1,5 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { fromAnthropicUsage, recordUsage } from "@/lib/billing/ledger.server";
+import { addGuestUsage } from "@/lib/billing/guest.server";
+import { guestGate } from "@/lib/billing/guestRequest.server";
+import { creditsFor } from "@/lib/billing/pricing";
 import { getCurrentUser } from "@/lib/auth/currentUser.server";
 
 const SYSTEM_PROMPT =
@@ -16,6 +19,16 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+
+  // The guest wall. User-initiated (select text → explain), so a spent
+  // allowance gets the sign-in modal, same as asking a question.
+  const user = await getCurrentUser();
+  const guest = await guestGate({
+    req,
+    signedIn: Boolean(user),
+    surface: "quick-explain",
+  });
+  if (guest.blocked) return guest.blocked;
 
   const { text } = (await req.json()) as { text?: string };
   if (!text?.trim()) {
@@ -51,13 +64,22 @@ export async function POST(req: Request) {
         const usage = fromAnthropicUsage(msg.usage);
 
         recordUsage({
-          ownerId: (await getCurrentUser())?.id ?? null,
+          ownerId: user?.id ?? null,
+          visitorId: guest.visitorId,
           surface: "quick-explain",
           provider: "anthropic",
           model: MODEL,
           ...usage,
           outcome: "success",
         });
+
+        if (!user && guest.visitorId) {
+          void addGuestUsage({
+            visitorId: guest.visitorId,
+            ipHash: guest.ipHash,
+            credits: creditsFor({ model: MODEL, ...usage }),
+          });
+        }
 
         // Emit all four fields, matching /api/chat. The two cache figures were
         // previously dropped here, which understates cost several-fold.

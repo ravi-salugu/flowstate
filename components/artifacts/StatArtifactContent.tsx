@@ -4,10 +4,26 @@ import { ArtifactContentStage } from "@/components/artifacts/ArtifactContentStag
 import type { ArtifactPayload } from "@/lib/artifactTypes";
 
 /**
+ * How much room the figure can claim. `value` is a string on purpose (see
+ * transcriptArtifacts) and is not always a numeral — "The only theatre of its
+ * format" has to read as the headline too, so the display type steps down
+ * as the figure gets wordier instead of overflowing the card. Style packs read
+ * this off `data-stat-figure` and pick their own clamp per step.
+ */
+function figureLength(value: string): "xl" | "lg" | "md" | "sm" {
+  const len = value.trim().length;
+  if (len <= 5) return "xl";
+  if (len <= 10) return "lg";
+  if (len <= 22) return "md";
+  return "sm";
+}
+
+/**
  * One spoken figure. A single number in a chart reads as a broken chart; here
  * the number is the whole design, and the delta (when there is one) sits under
  * it as a plain from→to rather than as an implied trend line.
  */
+
 export function StatArtifactContent({
   payload,
   fill = false,
@@ -24,7 +40,10 @@ export function StatArtifactContent({
 
   return (
     <ArtifactContentStage fill={fill} artifactId={artifactId}>
-      <div className="artifact-stat flex h-full flex-col justify-center gap-2 px-5 py-4">
+      <div
+        className="artifact-stat flex h-full flex-col justify-center gap-2 px-5 py-4"
+        data-stat-figure={figureLength(value)}
+      >
         <div className="artifact-stat-figure flex items-baseline gap-1.5">
           <span
             className={`artifact-stat-value font-semibold leading-none tracking-tight text-canvas-ink ${

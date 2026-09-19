@@ -61,12 +61,8 @@ import { logQaTurnEvent } from "@/lib/qaTurnEvents.server";
 import { recordUsage } from "@/lib/billing/ledger.server";
 import { resolveBillingOwner } from "@/lib/billing/owner";
 import { guardCredits } from "@/lib/billing/guard.server";
-import {
-  addGuestUsage,
-  clientIpFrom,
-  guardGuestCredits,
-  hashIp,
-} from "@/lib/billing/guest.server";
+import { addGuestUsage } from "@/lib/billing/guest.server";
+import { guestGate } from "@/lib/billing/guestRequest.server";
 import { creditsFor, estimateCredits } from "@/lib/billing/pricing";
 import {
   buildCanvasMemoryNote,
@@ -175,22 +171,17 @@ export async function POST(req: Request) {
     }
   }
 
-  // Guest identity. Only meaningful when signed out; middleware guarantees the
-  // cookie exists by the time any route runs.
-  const visitorId = user ? null : (req.headers.get("cookie")?.match(/(?:^|;\s*)fs_vid=([^;]+)/)?.[1] ?? null);
-  const guestIpHash = user ? null : hashIp(clientIpFrom(req.headers));
-
-  // The guest wall. Signed-in users skip this entirely — it is gated on
-  // GUEST_ENFORCEMENT, separate from BILLING_ENFORCEMENT, because the two ship
-  // at different times.
-  if (!user) {
-    const guestGuard = await guardGuestCredits({
-      visitorId,
-      ipHash: guestIpHash,
-      surface: "chat",
-    });
-    if (!guestGuard.ok) return guestGuard.response;
-  }
+  // Guest identity + the wall. Signed-in users skip this entirely — it is
+  // gated on GUEST_ENFORCEMENT, separate from BILLING_ENFORCEMENT, because the
+  // two ship at different times. Middleware guarantees the cookie exists by the
+  // time any route runs.
+  const guest = await guestGate({
+    req,
+    signedIn: Boolean(user),
+    surface: "chat",
+  });
+  if (guest.blocked) return guest.blocked;
+  const { visitorId, ipHash: guestIpHash } = guest;
 
   // Credit guard. In "off" (the default) and "shadow" this cannot refuse a
   // request — it only records what it *would* have done. Placed before the

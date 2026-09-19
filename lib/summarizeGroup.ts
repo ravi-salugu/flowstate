@@ -1,3 +1,4 @@
+import { raiseGuestWallIfLimited } from "@/lib/billing/guestWall";
 import {
   buildGroupTranscript,
   transcriptHasContent,
@@ -12,7 +13,7 @@ import { useCanvasStore } from "@/lib/store";
 export async function summarizeGroup(
   groupId: string,
   model: ClaudeModel,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true } | { ok: false; error: string | null }> {
   const state = useCanvasStore.getState();
   const group = state.groups[groupId];
   if (!group) return { ok: false, error: "Group not found" };
@@ -32,6 +33,12 @@ export async function summarizeGroup(
   });
 
   if (!res.ok) {
+    // A spent guest allowance raises the sign-in modal instead of surfacing an
+    // error. A null error means "stop, but say nothing" — both callers feed it
+    // straight into their error state, so null correctly clears it.
+    if (await raiseGuestWallIfLimited(res)) {
+      return { ok: false, error: null };
+    }
     let message = `Summarize failed (${res.status})`;
     try {
       const data = await res.json();
@@ -54,7 +61,7 @@ export async function summarizeGroup(
 export async function refreshGroupSummary(
   groupId: string,
   model: ClaudeModel,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true } | { ok: false; error: string | null }> {
   const state = useCanvasStore.getState();
   const group = state.groups[groupId];
   if (!group?.summaryMarkdown) {
@@ -82,6 +89,12 @@ export async function refreshGroupSummary(
   });
 
   if (!res.ok) {
+    // A spent guest allowance raises the sign-in modal instead of surfacing an
+    // error. A null error means "stop, but say nothing" — both callers feed it
+    // straight into their error state, so null correctly clears it.
+    if (await raiseGuestWallIfLimited(res)) {
+      return { ok: false, error: null };
+    }
     let message = `Summarize failed (${res.status})`;
     try {
       const data = await res.json();

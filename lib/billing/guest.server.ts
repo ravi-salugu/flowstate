@@ -43,12 +43,69 @@ export function isGuestWallEnabled(): boolean {
   return process.env.GUEST_ENFORCEMENT?.trim().toLowerCase() === "on";
 }
 
-/** sha256(ip + salt). The raw IP is never stored, matching visitor_events. */
+/**
+ * Reduces an address to the unit we actually want to rate-limit, BEFORE hashing.
+ *
+ * IPv4 is used whole. IPv6 is cut to its /64 prefix, because privacy extensions
+ * (RFC 4941) rotate the host half of a v6 address regularly — often daily, and
+ * on some stacks per-connection. Hashing the full address therefore mints a
+ * fresh ip_hash every rotation and the backstop silently never fires, which
+ * matters because most mobile traffic is now IPv6. The /64 is the smallest unit
+ * an ISP assigns to a single subscriber, so it is the right grain: stable
+ * across rotation, and never wider than one customer.
+ *
+ * Anything unparseable is passed through unchanged — worst case it behaves
+ * exactly as it did before this function existed.
+ */
+export function normalizeIpForHash(raw: string): string {
+  let addr = raw.trim().toLowerCase();
+  if (!addr) return "";
+
+  // [::1]:443 → ::1
+  if (addr.startsWith("[")) {
+    const close = addr.indexOf("]");
+    if (close > 0) addr = addr.slice(1, close);
+  }
+  // fe80::1%eth0 → fe80::1
+  const zone = addr.indexOf("%");
+  if (zone !== -1) addr = addr.slice(0, zone);
+
+  if (!addr.includes(":")) return addr; // IPv4, or not an address at all
+
+  // IPv4-mapped/-compatible (::ffff:1.2.3.4). The network really uses the v4
+  // address, so limit on that rather than on a prefix shared by every mapping.
+  const lastGroup = addr.slice(addr.lastIndexOf(":") + 1);
+  if (lastGroup.includes(".")) return lastGroup;
+
+  // Expand "::" so the first four groups are genuinely the /64 prefix.
+  let groups: string[];
+  const doubleColon = addr.indexOf("::");
+  if (doubleColon === -1) {
+    groups = addr.split(":");
+  } else {
+    const head = addr.slice(0, doubleColon).split(":").filter(Boolean);
+    const tail = addr.slice(doubleColon + 2).split(":").filter(Boolean);
+    const missing = 8 - head.length - tail.length;
+    if (missing < 0) return addr; // malformed — leave it alone
+    groups = [...head, ...Array<string>(missing).fill("0"), ...tail];
+  }
+
+  if (groups.length < 4) return addr; // malformed — leave it alone
+
+  return groups
+    .slice(0, 4)
+    .map((g) => (g || "0").padStart(4, "0"))
+    .join(":");
+}
+
+/** sha256(normalized ip + salt). The raw IP is never stored, matching visitor_events. */
 export function hashIp(ip: string | null | undefined): string | null {
   if (!ip) return null;
   const salt = process.env.GUEST_IP_SALT?.trim();
   if (!salt) return null; // no salt configured => skip the IP backstop entirely
-  return createHash("sha256").update(`${ip}${salt}`).digest("hex");
+  const normalized = normalizeIpForHash(ip);
+  if (!normalized) return null;
+  return createHash("sha256").update(`${normalized}${salt}`).digest("hex");
 }
 
 /** Best-effort client IP from the proxy headers Vercel sets. */

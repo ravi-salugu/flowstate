@@ -18,6 +18,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { useCanvasStore } from "@/lib/store";
 import { buildCanvasSnapshot } from "@/lib/canvasSnapshot";
 import { stashGuestCanvas } from "@/lib/guestCanvas";
+import { buildDuplicateTitle } from "@/lib/collaborationPersistence";
 
 import type { CanvasMeta } from "@/lib/canvasPersistence";
 import type { CollaborationContextValue } from "@/hooks/useCollaboration";
@@ -218,11 +219,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // useCanvasPersistence.loadCanvasForUser).
     if (!user) {
       try {
-        const source = useCanvasStore.getState().getCanvasSnapshotSource();
-        const snapshot = buildCanvasSnapshot(source);
-        const title =
-          canvases.find((c) => c.id === activeCanvasId)?.title ?? "My canvas";
-        stashGuestCanvas(snapshot, title);
+        const publishedOrigin = useCanvasStore.getState().publishedOrigin;
+
+        // On a published canvas, only stash once they have actually forked it.
+        // Without this guard, a listener who merely READ the canvas and then
+        // signed in would find a full copy of someone else's canvas dumped
+        // into their account, which they never asked for.
+        const shouldStash = !publishedOrigin || publishedOrigin.forked;
+
+        if (shouldStash) {
+          const source = useCanvasStore.getState().getCanvasSnapshotSource();
+          const snapshot = buildCanvasSnapshot(source);
+          const title = publishedOrigin
+            ? buildDuplicateTitle(publishedOrigin.title)
+            : (canvases.find((c) => c.id === activeCanvasId)?.title ??
+              "My canvas");
+
+          stashGuestCanvas(
+            snapshot,
+            title,
+            publishedOrigin
+              ? {
+                  sourcePublishedSlug: publishedOrigin.slug,
+                  sourcePublishedVersion: publishedOrigin.version,
+                }
+              : undefined,
+          );
+        }
       } catch {
         // Best-effort — never block sign-in on a stash failure.
       }
@@ -317,6 +340,13 @@ export function usePersistenceReady(): boolean {
 
 export function useCanEditCanvas(): boolean {
   const { canEdit, user, activeCanvasId } = useAuth();
+  const publishedOrigin = useCanvasStore((s) => s.publishedOrigin);
+  // A published canvas is always editable, signed in or not: what the visitor
+  // edits is their own in-memory fork, and they have no write path to the
+  // original. A signed-in visitor would otherwise fail the canEdit check
+  // below — they are not a collaborator on someone else's canvas — and lose
+  // the ask button that is supposed to start the fork.
+  if (publishedOrigin) return true;
   if (!user || !activeCanvasId) return true;
   return canEdit;
 }

@@ -1,3 +1,4 @@
+import { ASSET_STORAGE_BUCKET } from "@/lib/storageBuckets";
 import type { UploadedAttachment } from "@/lib/store";
 import type { CanvasAsset, CanvasAssetKind } from "@/lib/store";
 import {
@@ -35,7 +36,10 @@ export const DOCUMENT_FILE_ACCEPT =
 export const CODE_FILE_ACCEPT =
   ".ts,.tsx,.js,.jsx,.py,.sql,.css,.html,.go,.rs,.java,.cpp,.c,.cs,.php,.rb,.sh,.yaml,.yml";
 
-export const ASSET_STORAGE_BUCKET = "asset-files";
+// Defined in a leaf module so server code can name the bucket without
+// importing this file (which pulls in the browser Supabase client).
+// Imported as well as re-exported: this file uses it internally.
+export { ASSET_STORAGE_BUCKET };
 
 /** Best-effort removal of uploaded assets for a deleted canvas. */
 export async function deleteCanvasStorageAssets(

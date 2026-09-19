@@ -525,7 +525,7 @@ export function buildJagadambaCanvasSection(): TranscriptImportCanvasSection {
   );
   spawn(
     "tip-art-jag-stat-months",
-    statPayload("Site to opening", {
+    statPayload("Construction time", {
       value: "18",
       unit: "months",
       label:
@@ -536,7 +536,7 @@ export function buildJagadambaCanvasSection(): TranscriptImportCanvasSection {
   );
   spawn(
     "tip-art-jag-stat-rooms",
-    statPayload("The hotel upstairs", {
+    statPayload("Hotel capacity", {
       value: "23",
       unit: "rooms",
       label:
@@ -547,7 +547,7 @@ export function buildJagadambaCanvasSection(): TranscriptImportCanvasSection {
   );
   spawn(
     "tip-art-jag-quote-house",
-    quotePayload("What he asked his father for", {
+    quotePayload("Moving the family in", {
       text: "I told my father let's have our house also in here also",
       speaker: JAGADISH,
       timestamp: "5:26",
@@ -606,10 +606,10 @@ export function buildJagadambaCanvasSection(): TranscriptImportCanvasSection {
   );
   spawn(
     "tip-art-jag-stat-only",
-    statPayload("The only one in the state", {
-      value: "The only one",
+    statPayload("Standing in the state", {
+      value: "The only theatre of its format",
       label:
-        "Theatre of its format in Andhra Pradesh at the time — which is why the distributors needed them",
+        "In Andhra Pradesh at the time — which is why the distributors needed them",
       speaker: JAGADISH,
     }),
     "tip-c-jag-bombay-3",
@@ -630,7 +630,7 @@ export function buildJagadambaCanvasSection(): TranscriptImportCanvasSection {
   // Chapter 3 — H quote, D' stat, E mechanism, B table.
   spawn(
     "tip-art-jag-quote-surround",
-    quotePayload("What the added sound did", {
+    quotePayload("The surround effect", {
       text:
         "When something is thrown around it would seem like something is really thrown around.",
       speaker: JAGADISH,
@@ -653,7 +653,7 @@ export function buildJagadambaCanvasSection(): TranscriptImportCanvasSection {
   );
   spawn(
     "tip-art-jag-quote-operator",
-    quotePayload("Why he ran the console himself", {
+    quotePayload("Working the console", {
       text:
         "I wanted to give audience a great experience cuz I thought my operator was not doing a great job.",
       speaker: JAGADISH,
@@ -876,7 +876,7 @@ export function buildJagadambaCanvasSection(): TranscriptImportCanvasSection {
   );
   spawn(
     "tip-art-jag-stat-weeks",
-    statPayload("How long a film holds the screen", {
+    statPayload("Run length per film", {
       value: "2 weeks",
       label:
         "Down from four — but more of the films they could not previously play are now reaching them",
@@ -887,7 +887,7 @@ export function buildJagadambaCanvasSection(): TranscriptImportCanvasSection {
   );
   spawn(
     "tip-art-jag-quote-single",
-    quotePayload("Who is actually winning", {
+    quotePayload("Single screens vs multiplexes", {
       text: "actually our single screens are doing better than multiplexes",
       speaker: JAGADISH,
       timestamp: "23:56",
@@ -923,7 +923,7 @@ export function buildJagadambaCanvasSection(): TranscriptImportCanvasSection {
   );
   spawn(
     "tip-art-jag-quote-speakers",
-    quotePayload("Whenever a better speaker exists", {
+    quotePayload("Upgrading the speakers", {
       text: "I change it. I can't stop myself.",
       speaker: JAGADISH,
       timestamp: "28:01",

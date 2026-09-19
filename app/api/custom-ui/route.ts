@@ -15,6 +15,9 @@ import { sanitizeCustomUiSource } from "@/lib/customUiSource";
 import { streamCustomUiViaAnthropic } from "@/lib/customUiAnthropicStream";
 import { runCustomUiGenerator } from "@/lib/cursorSdk/customUiGenerator";
 import { recordUsage } from "@/lib/billing/ledger.server";
+import { addGuestUsage } from "@/lib/billing/guest.server";
+import { guestGate } from "@/lib/billing/guestRequest.server";
+import { creditsFor } from "@/lib/billing/pricing";
 import { getCurrentUser } from "@/lib/auth/currentUser.server";
 import { getCursorSdkRuntimeIssue } from "@/lib/cursorSdk/runtimeCheck";
 import { initialSdkBuildStages } from "@/lib/cursorSdk/sdkStageLabels";
@@ -68,6 +71,17 @@ function shouldSkipCursorSdk(): boolean {
 }
 
 export async function POST(req: Request) {
+  // The guest wall. claudeClient routes custom-UI work here instead of
+  // /api/chat, so without this a guest could dodge the allowance entirely by
+  // phrasing questions as build requests — on the most expensive path there is.
+  const user = await getCurrentUser();
+  const guest = await guestGate({
+    req,
+    signedIn: Boolean(user),
+    surface: "custom-ui",
+  });
+  if (guest.blocked) return guest.blocked;
+
   const body = (await req.json()) as {
     question: string;
     history?: HistoryMessage[];
@@ -313,15 +327,30 @@ export async function POST(req: Request) {
         // a flat calibrated constant (NON_TOKEN_USD.cursorRun) rather than a
         // measurement — see Phase 4.5. The Anthropic fallback bills real tokens.
         if (billedProvider) {
+          const cursorRunCount = billedProvider === "cursor" ? cursorRuns : 0;
+
           recordUsage({
-            ownerId: (await getCurrentUser())?.id ?? null,
+            ownerId: user?.id ?? null,
+            visitorId: guest.visitorId,
             surface: "custom-ui",
             provider: billedProvider,
             model: billedModel,
             ...billedUsage,
-            cursorRuns: billedProvider === "cursor" ? cursorRuns : 0,
+            cursorRuns: cursorRunCount,
             outcome: "success",
           });
+
+          if (!user && guest.visitorId) {
+            void addGuestUsage({
+              visitorId: guest.visitorId,
+              ipHash: guest.ipHash,
+              credits: creditsFor({
+                model: billedModel,
+                ...billedUsage,
+                cursorRuns: cursorRunCount,
+              }),
+            });
+          }
         }
 
         closeStream();

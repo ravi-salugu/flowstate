@@ -1,5 +1,7 @@
 "use client";
 
+import { raiseGuestWallIfLimited } from "@/lib/billing/guestWall";
+
 export interface QuickExplainCallbacks {
   onToken: (text: string) => void;
   onDone: () => void;
@@ -27,6 +29,13 @@ export function quickExplain(
       });
 
       if (!res.ok) {
+        // A spent guest allowance is a conversion moment, not an error. The
+        // modal already explains itself, so report nothing here — "HTTP 402"
+        // in the popover would be alarming and meaningless.
+        if (await raiseGuestWallIfLimited(res)) {
+          cb.onDone();
+          return;
+        }
         cb.onError(`HTTP ${res.status}`);
         return;
       }

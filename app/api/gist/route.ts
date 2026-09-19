@@ -1,5 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { fromAnthropicUsage, recordUsage } from "@/lib/billing/ledger.server";
+import { addGuestUsage } from "@/lib/billing/guest.server";
+import { guestGate } from "@/lib/billing/guestRequest.server";
+import { creditsFor } from "@/lib/billing/pricing";
 import { getCurrentUser } from "@/lib/auth/currentUser.server";
 
 // Rolling per-thread gist: given the previous gist and only the latest
@@ -27,6 +30,16 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+
+  // Unlike every other metered surface, a spent allowance here returns a
+  // normal 200 with no gist — NEVER a 402. The gist fires automatically after
+  // an answer lands; the visitor did not ask for it, so raising the sign-in
+  // wall would be baffling, and it would fire at a moment they are not even
+  // looking at. Skipping costs them a slightly staler branch summary and
+  // nothing else.
+  const user = await getCurrentUser();
+  const guest = await guestGate({ req, signedIn: Boolean(user), surface: "gist" });
+  if (guest.blocked) return Response.json({ gist: null });
 
   const { previousGist, threadTitle, question, answer } = (await req.json()) as {
     previousGist?: string;
@@ -66,14 +79,25 @@ export async function POST(req: Request) {
       messages: [{ role: "user", content: parts.join("\n\n") }],
     });
 
+    const usage = fromAnthropicUsage(message.usage);
+
     recordUsage({
-      ownerId: (await getCurrentUser())?.id ?? null,
+      ownerId: user?.id ?? null,
+      visitorId: guest.visitorId,
       surface: "gist",
       provider: "anthropic",
       model: GIST_MODEL,
-      ...fromAnthropicUsage(message.usage),
+      ...usage,
       outcome: "success",
     });
+
+    if (!user && guest.visitorId) {
+      void addGuestUsage({
+        visitorId: guest.visitorId,
+        ipHash: guest.ipHash,
+        credits: creditsFor({ model: GIST_MODEL, ...usage }),
+      });
+    }
 
     const textBlock = message.content.find((b) => b.type === "text");
     const gist =

@@ -781,6 +781,26 @@ interface CanvasState {
   openGuestWall: (questionsAsked: number | null) => void;
   dismissGuestWall: () => void;
 
+  /** Set while viewing a published canvas (/c/<slug>).
+   *
+   *  `forked` flips the first time the visitor does anything generative. It is
+   *  bookkeeping and UI only: there is nothing to copy, because the store
+   *  already holds their fork and they have no write path to the original. It
+   *  drives the "(copy)" title suffix and the banner, and carries the lineage
+   *  recorded on the canvas they adopt when they sign in. */
+  publishedOrigin: {
+    slug: string;
+    publishedCanvasId: string;
+    version: number;
+    title: string;
+    ownerName: string | null;
+    forked: boolean;
+  } | null;
+  setPublishedOrigin: (
+    origin: CanvasState["publishedOrigin"],
+  ) => void;
+  markPublishedCanvasForked: () => void;
+
   sessionUsage: {
     inputTokens: number;
     outputTokens: number;
@@ -1681,6 +1701,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ guestWall: { open: true, questionsAsked } }),
   dismissGuestWall: () =>
     set((s) => ({ guestWall: { ...s.guestWall, open: false } })),
+  publishedOrigin: null,
+  setPublishedOrigin: (origin) => set({ publishedOrigin: origin }),
+  markPublishedCanvasForked: () =>
+    set((s) =>
+      // Idempotent: called from every mutation entry point, so it must be free
+      // to run on every keystroke-driven action without churning state.
+      !s.publishedOrigin || s.publishedOrigin.forked
+        ? s
+        : { publishedOrigin: { ...s.publishedOrigin, forked: true } },
+    ),
   sessionUsage: {
     inputTokens: 0,
     outputTokens: 0,
@@ -2287,6 +2317,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   submitCardQuestion: (cardId, question, options) => {
     const q = question.trim();
     if (!q) return;
+    get().markPublishedCanvasForked();
     const st = get();
     const card = st.cards[cardId];
     if (!card) return;
@@ -2332,6 +2363,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   submitFocusMessage: (question, options) => {
     const q = question.trim();
     if (!q) return null;
+    get().markPublishedCanvasForked();
     const state = get();
     if (state.canvasReadOnly) return null;
     const draft = state.focusDraftChat;
@@ -3543,10 +3575,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   recordUndo: () =>
     set((state) => {
+      // Catch-all: drag, delete, group, text edit — anything undoable — also
+      // means the visitor has started making this canvas their own.
+      const publishedOrigin =
+        state.publishedOrigin && !state.publishedOrigin.forked
+          ? { ...state.publishedOrigin, forked: true }
+          : state.publishedOrigin;
       const snap = graphSnapshotFromState(state);
       const next = [...state.undoPast, snap];
       if (next.length > MAX_UNDO_STACK) next.shift();
-      return { undoPast: next };
+      return { undoPast: next, publishedOrigin };
     }),
 
   undo: () =>
@@ -3823,6 +3861,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }),
 
   createRootCard: (position) => {
+    get().markPublishedCanvasForked();
     const tuning = TUNING;
     let cardId = "";
     set((state) => {
@@ -4981,6 +5020,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   createFollowUp: (parentId, question, options) => {
+    get().markPublishedCanvasForked();
     let childId: string | null = null;
     let parentThreadId: string | null = null;
     set((state) => {
@@ -5923,6 +5963,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       focusDraftChat: null,
       collaborationHasEdits: false,
       canvasReadOnly: false,
+      publishedOrigin: null,
       canvasLoadReveal: null,
     });
   },

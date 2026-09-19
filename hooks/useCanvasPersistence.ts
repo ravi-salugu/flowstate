@@ -56,6 +56,7 @@ import {
 import {
   deleteCanvas,
   fetchSharedCanvasList,
+  snapshotWithOwnerAttribution,
 } from "@/lib/collaborationPersistence";
 import { deleteCanvasStorageAssets } from "@/lib/attachments";
 import {
@@ -65,12 +66,8 @@ import {
 import { clearLandingAnimated } from "@/lib/motion/performance";
 import type { Viewport } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
-import { isArtifactCatalogSessionActive } from "@/lib/artifactCatalogSession";
-import { isLandingCanvasSessionActive } from "@/lib/landingCanvasSession";
-import { isMobileSdlcSandboxSessionActive } from "@/lib/mobileSdlcSandboxSession";
-import { isPerfFixtureSessionActive } from "@/lib/perf/perfFixtureSession";
-import { isSampleCanvasPreviewSessionActive } from "@/lib/sampleCanvases/sampleCanvasPreviewSession";
-import { isTranscriptImportPlaygroundSessionActive } from "@/lib/transcriptImportPlaygroundSession";
+import { isEphemeralFixtureSessionActive } from "@/lib/ephemeralCanvasSessions";
+import { isPublishedCanvasSessionActive } from "@/lib/publishedCanvasSession";
 import { useCanvasStore } from "@/lib/store";
 import type { PersistenceStatus, SaveStatus } from "@/lib/authTypes";
 
@@ -172,7 +169,9 @@ export function useCanvasPersistence({
   // check, which would briefly treat a returning user as a guest).
   useEffect(() => {
     ephemeralRef.current =
-      localReadOnly || (supabaseConfigured && !authLoading && !user);
+      localReadOnly ||
+      isPublishedCanvasSessionActive() ||
+      (supabaseConfigured && !authLoading && !user);
   }, [authLoading, localReadOnly, supabaseConfigured, user]);
 
   const cacheActiveSessionSnapshot = useCallback(() => {
@@ -354,11 +353,7 @@ export function useCanvasPersistence({
     if (!user) return;
 
     if (
-      isArtifactCatalogSessionActive() ||
-      isLandingCanvasSessionActive() ||
-      isMobileSdlcSandboxSessionActive() ||
-      isSampleCanvasPreviewSessionActive() ||
-      isTranscriptImportPlaygroundSessionActive() ||
+      isEphemeralFixtureSessionActive() ||
       useCanvasStore.getState().canvasReadOnly
     ) {
       return;
@@ -641,14 +636,31 @@ export function useCanvasPersistence({
         if (guestStash) {
           clearGuestCanvasStash();
           try {
+            // Publishing scrubs contributorIds / createdByUserId, so the
+            // adopter is stamped as the author of what is now their canvas.
+            const adoptedSnapshot = snapshotWithOwnerAttribution(
+              guestStash.snapshot,
+              nextUser.id,
+            );
+
             const adopted = await createCanvasFromSnapshot(
               supabase,
               nextUser.id,
               guestStash.title,
-              guestStash.snapshot,
+              adoptedSnapshot,
+              guestStash.lineage,
             );
             if (isStaleLoad(generation)) return;
-            hydrateFromSnapshot(guestStash.snapshot, {
+
+            // Best-effort copy counter, deliberately inside the existing
+            // try/catch: adoption must never fail on a statistic.
+            if (guestStash.lineage?.sourcePublishedSlug) {
+              void supabase.rpc("record_published_canvas_copy", {
+                p_slug: guestStash.lineage.sourcePublishedSlug,
+              });
+            }
+
+            hydrateFromSnapshot(adoptedSnapshot, {
               applyViewport: true,
               canvasReveal: true,
             });
@@ -1060,6 +1072,18 @@ export function useCanvasPersistence({
       return;
     }
 
+    // A published canvas owns the store for the life of the page. Falling
+    // through here would reset a guest's in-progress fork (the !user branch
+    // calls resetCanvasState) or, for a signed-in visitor, load their own
+    // canvas over what they came to read. Still marks ready: PublishedCanvasApp
+    // waits on persistenceReady before hydrating, so returning early without
+    // it would deadlock the page.
+    if (isPublishedCanvasSessionActive()) {
+      setPersistenceStatus("ready");
+      setSaveStatus("idle");
+      return;
+    }
+
     if (!user) {
       loadGenerationRef.current += 1;
       canvasIdRef.current = null;
@@ -1119,15 +1143,7 @@ export function useCanvasPersistence({
     let prevSlice = pickCanvasPersistSlice(useCanvasStore.getState());
 
     const scheduleSave = () => {
-      if (
-        isArtifactCatalogSessionActive() ||
-        isLandingCanvasSessionActive() ||
-        isMobileSdlcSandboxSessionActive() ||
-        isPerfFixtureSessionActive() ||
-        isSampleCanvasPreviewSessionActive() ||
-        isTranscriptImportPlaygroundSessionActive()
-      )
-        return;
+      if (isEphemeralFixtureSessionActive()) return;
       if (
         isHydratingRef.current ||
         isSwitchingRef.current ||

@@ -1,5 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { fromAnthropicUsage, recordUsage } from "@/lib/billing/ledger.server";
+import { addGuestUsage } from "@/lib/billing/guest.server";
+import { guestGate } from "@/lib/billing/guestRequest.server";
+import { creditsFor } from "@/lib/billing/pricing";
 import { getCurrentUser } from "@/lib/auth/currentUser.server";
 import type { GroupTranscript } from "@/lib/buildGroupTranscript";
 
@@ -50,6 +53,18 @@ export async function POST(req: Request) {
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
+
+  // The guest wall. This is the most expensive metered surface in the app —
+  // Sonnet over up to 100k characters of transcript — and until now it was the
+  // only one with no allowance check at all, so a guest past their limit on
+  // /api/chat could still summarize freely.
+  const user = await getCurrentUser();
+  const guest = await guestGate({
+    req,
+    signedIn: Boolean(user),
+    surface: "summarize",
+  });
+  if (guest.blocked) return guest.blocked;
 
   const { model, transcript, mode, existingMarkdown } = await req.json();
 
@@ -107,14 +122,28 @@ export async function POST(req: Request) {
       ],
     });
 
+    const usedModel = model ?? "claude-sonnet-4-6";
+    const usage = fromAnthropicUsage(message.usage);
+
     recordUsage({
-      ownerId: (await getCurrentUser())?.id ?? null,
+      ownerId: user?.id ?? null,
+      visitorId: guest.visitorId,
       surface: "summarize",
       provider: "anthropic",
-      model: model ?? "claude-sonnet-4-6",
-      ...fromAnthropicUsage(message.usage),
+      model: usedModel,
+      ...usage,
       outcome: "success",
     });
+
+    // Guests: add real spend to the lifetime counter the wall reads, so a
+    // summarize actually counts against the allowance instead of being free.
+    if (!user && guest.visitorId) {
+      void addGuestUsage({
+        visitorId: guest.visitorId,
+        ipHash: guest.ipHash,
+        credits: creditsFor({ model: usedModel, ...usage }),
+      });
+    }
 
     const textBlock = message.content.find((b) => b.type === "text");
     const markdown =

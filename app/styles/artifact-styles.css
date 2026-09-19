@@ -892,32 +892,52 @@ html[data-theme="dark"] [data-artifact-style="neobrutalism"] {
 
 /* --------------------------------- Stat -------------------------------- */
 
-/* The number is the whole design. Eyebrow label pinned top, attribution
-   pinned bottom, and the numeral fills whatever is left — it scales with
-   BOTH card dimensions (cqw / cqh on the size-contained stage), so a tall
-   card gets a taller figure and a narrow one never overflows. */
+/* The figure leads and the sentence explains it underneath — the title in the
+   header is only a label, so the card has to read on its own from the number
+   down. The figure scales with BOTH card dimensions (cqw / cqh on the
+   size-contained stage) and steps down as `value` gets wordier, because a
+   spoken figure is not always a numeral: "The only one theatre of its format"
+   has to carry the card the way "18" does. The sentence is set at reading
+   size, not eyebrow size, and absorbs the leftover height so a tall card does
+   not hollow out around the number. */
 [data-artifact-style="bento"] .artifact-stat {
-  justify-content: space-between;
-  gap: 10px;
-  padding: 18px 22px;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 18px 22px 20px;
+
+  /* Display steps, re-picked per figure length below. */
+  --stat-figure-min: 40px;
+  --stat-figure-cqw: 24cqw;
+  --stat-figure-cqh: 38cqh;
+  --stat-figure-max: var(--canvas-artifact-display-size);
+  --stat-unit-min: 18px;
+  --stat-unit-cqw: 7.5cqw;
+  --stat-unit-cqh: 13cqh;
+  --stat-unit-max: 48px;
 }
-[data-artifact-style="bento"] .artifact-stat-label {
-  order: -1;
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.35;
-  font-weight: 600;
-  letter-spacing: var(--canvas-artifact-eyebrow-tracking);
-  text-transform: uppercase;
-  color: rgb(var(--canvas-muted));
+[data-artifact-style="bento"] .artifact-stat[data-stat-figure="lg"] {
+  --stat-figure-cqw: 15.5cqw;
+  --stat-figure-cqh: 27cqh;
+}
+[data-artifact-style="bento"] .artifact-stat[data-stat-figure="md"] {
+  --stat-figure-min: 30px;
+  --stat-figure-cqw: 11cqw;
+  --stat-figure-cqh: 19cqh;
+  --stat-figure-max: 68px;
+}
+[data-artifact-style="bento"] .artifact-stat[data-stat-figure="sm"] {
+  --stat-figure-min: 24px;
+  --stat-figure-cqw: 8cqw;
+  --stat-figure-cqh: 13.5cqh;
+  --stat-figure-max: 54px;
 }
 [data-artifact-style="bento"] .artifact-stat-figure {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  align-content: center;
+  align-content: flex-start;
   gap: 0.14em;
 }
 [data-artifact-style="bento"] .artifact-stat-value {
@@ -925,23 +945,48 @@ html[data-theme="dark"] [data-artifact-style="neobrutalism"] {
   font-weight: var(--canvas-artifact-display-weight);
   letter-spacing: var(--canvas-artifact-display-tracking);
   font-size: 44px;
-  line-height: 0.92;
+  line-height: 0.96;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 [data-artifact-style="bento"] [data-canvas-artifact] .artifact-stat-value {
-  font-size: clamp(40px, min(20cqw, 34cqh), var(--canvas-artifact-display-size));
+  font-size: clamp(
+    var(--stat-figure-min),
+    min(var(--stat-figure-cqw), var(--stat-figure-cqh)),
+    var(--stat-figure-max)
+  );
 }
 [data-artifact-style="bento"] .artifact-stat-unit {
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 600;
-  color: rgb(var(--canvas-muted));
+  color: rgb(var(--canvas-ink) / 0.85);
 }
 [data-artifact-style="bento"] [data-canvas-artifact] .artifact-stat-unit {
-  font-size: clamp(14px, min(5cqw, 8.5cqh), 34px);
+  font-size: clamp(
+    var(--stat-unit-min),
+    min(var(--stat-unit-cqw), var(--stat-unit-cqh)),
+    var(--stat-unit-max)
+  );
+}
+/* The sentence, not an eyebrow: sentence case, reading weight, second in the
+   stack, and it takes whatever vertical slack is left. */
+[data-artifact-style="bento"] .artifact-stat-label {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.32;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  text-transform: none;
+  color: rgb(var(--canvas-muted));
+}
+[data-artifact-style="bento"] [data-canvas-artifact] .artifact-stat-label {
+  font-size: clamp(15px, min(5.6cqw, 9cqh), 28px);
 }
 [data-artifact-style="bento"] .artifact-stat-delta {
-  font-size: 12px;
+  flex: 0 0 auto;
+  font-size: 13px;
   margin: 0;
   color: rgb(var(--canvas-muted));
 }
@@ -949,6 +994,7 @@ html[data-theme="dark"] [data-artifact-style="neobrutalism"] {
   color: rgb(var(--canvas-ink));
 }
 [data-artifact-style="bento"] .artifact-stat-attribution {
+  flex: 0 0 auto;
   font-size: 11.5px;
   opacity: 1;
   margin: 0;
@@ -957,19 +1003,47 @@ html[data-theme="dark"] [data-artifact-style="neobrutalism"] {
 
 /* -------------------------------- Quote -------------------------------- */
 
-/* A hanging opening mark on the first line, the line itself set heavy and
-   balanced, attribution behind a dash. The mark is inline (line-height 0)
-   so the text never has to clear a floating glyph — spacing stays even at
-   every card size. */
+/* The mark is the picture. One oversized opening quote sits in the dead space
+   at the top right and runs off the card edge — the stage clips it, so it
+   reads as a fragment of something much larger rather than a glyph that
+   happens to be big. The line is set heavy and balanced beneath it, with a
+   right inset so the text never collides with the mark; attribution behind a
+   dash. */
 [data-artifact-style="bento"] .artifact-quote {
+  position: relative;
   gap: 12px;
   padding: 20px 22px 18px;
+  overflow: hidden;
+}
+[data-artifact-style="bento"] .artifact-quote::before {
+  content: "\201C";
+  position: absolute;
+  /* The glyph's ink is only ~a quarter of its em box, so the type size runs
+     far past the card and the offsets pull the ink back up against the top
+     right corner. */
+  top: -0.07em;
+  right: -0.14em;
+  z-index: 0;
+  font-family: var(--canvas-artifact-display-family);
+  font-size: 96px;
+  line-height: 1;
+  font-weight: 800;
+  color: rgb(var(--canvas-ink) / 0.16);
+  pointer-events: none;
+  user-select: none;
+}
+[data-artifact-style="bento"] [data-canvas-artifact] .artifact-quote::before {
+  font-size: clamp(120px, min(62cqw, 215cqh), 460px);
 }
 [data-artifact-style="bento"] .artifact-quote-rule {
   display: none;
 }
 [data-artifact-style="bento"] .artifact-quote-body {
+  position: relative;
+  z-index: 1;
   padding: 0;
+  /* Clear of the mark's visible stroke, proportional so it holds at any size. */
+  padding-right: 20%;
   font-family: var(--canvas-artifact-display-family);
   font-size: 22px;
   line-height: 1.22;
@@ -980,20 +1054,14 @@ html[data-theme="dark"] [data-artifact-style="neobrutalism"] {
 [data-artifact-style="bento"] [data-canvas-artifact] .artifact-quote-body {
   font-size: clamp(17px, min(6cqw, 13cqh), var(--canvas-artifact-quote-size));
 }
-[data-artifact-style="bento"] .artifact-quote-body::before {
-  content: "\201C";
-  display: inline-block;
-  font-size: 1.9em;
-  line-height: 0;
-  vertical-align: -0.42em;
-  margin-right: 0.06em;
-  font-weight: 800;
-  color: rgb(var(--canvas-ink) / 0.55);
-}
+/* The hanging inline mark is gone — the oversized one on the card carries it. */
+[data-artifact-style="bento"] .artifact-quote-body::before,
 [data-artifact-style="bento"] .artifact-quote-body::after {
   content: none;
 }
 [data-artifact-style="bento"] .artifact-quote-caption {
+  position: relative;
+  z-index: 1;
   padding-left: 0;
   font-size: 12px;
   gap: 4px 10px;
@@ -1411,32 +1479,52 @@ html[data-theme="dark"] [data-artifact-style="bento"] {
 
 /* --------------------------------- Stat -------------------------------- */
 
-/* The number is the whole design. Eyebrow label pinned top, attribution
-   pinned bottom, and the numeral fills whatever is left — it scales with
-   BOTH card dimensions (cqw / cqh on the size-contained stage), so a tall
-   card gets a taller figure and a narrow one never overflows. */
+/* The figure leads and the sentence explains it underneath — the title in the
+   header is only a label, so the card has to read on its own from the number
+   down. The figure scales with BOTH card dimensions (cqw / cqh on the
+   size-contained stage) and steps down as `value` gets wordier, because a
+   spoken figure is not always a numeral: "The only one theatre of its format"
+   has to carry the card the way "18" does. The sentence is set at reading
+   size, not eyebrow size, and absorbs the leftover height so a tall card does
+   not hollow out around the number. */
 [data-artifact-style="riso"] .artifact-stat {
-  justify-content: space-between;
-  gap: 10px;
-  padding: 18px 22px;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 18px 22px 20px;
+
+  /* Display steps, re-picked per figure length below. */
+  --stat-figure-min: 40px;
+  --stat-figure-cqw: 24cqw;
+  --stat-figure-cqh: 38cqh;
+  --stat-figure-max: var(--canvas-artifact-display-size);
+  --stat-unit-min: 18px;
+  --stat-unit-cqw: 7.5cqw;
+  --stat-unit-cqh: 13cqh;
+  --stat-unit-max: 48px;
 }
-[data-artifact-style="riso"] .artifact-stat-label {
-  order: -1;
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.35;
-  font-weight: 600;
-  letter-spacing: var(--canvas-artifact-eyebrow-tracking);
-  text-transform: uppercase;
-  color: rgb(var(--canvas-muted));
+[data-artifact-style="riso"] .artifact-stat[data-stat-figure="lg"] {
+  --stat-figure-cqw: 15.5cqw;
+  --stat-figure-cqh: 27cqh;
+}
+[data-artifact-style="riso"] .artifact-stat[data-stat-figure="md"] {
+  --stat-figure-min: 30px;
+  --stat-figure-cqw: 11cqw;
+  --stat-figure-cqh: 19cqh;
+  --stat-figure-max: 68px;
+}
+[data-artifact-style="riso"] .artifact-stat[data-stat-figure="sm"] {
+  --stat-figure-min: 24px;
+  --stat-figure-cqw: 8cqw;
+  --stat-figure-cqh: 13.5cqh;
+  --stat-figure-max: 54px;
 }
 [data-artifact-style="riso"] .artifact-stat-figure {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  align-content: center;
+  align-content: flex-start;
   gap: 0.14em;
 }
 [data-artifact-style="riso"] .artifact-stat-value {
@@ -1445,23 +1533,48 @@ html[data-theme="dark"] [data-artifact-style="bento"] {
   font-weight: var(--canvas-artifact-display-weight);
   letter-spacing: var(--canvas-artifact-display-tracking);
   font-size: 44px;
-  line-height: 0.92;
+  line-height: 0.96;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 [data-artifact-style="riso"] [data-canvas-artifact] .artifact-stat-value {
-  font-size: clamp(40px, min(20cqw, 34cqh), var(--canvas-artifact-display-size));
+  font-size: clamp(
+    var(--stat-figure-min),
+    min(var(--stat-figure-cqw), var(--stat-figure-cqh)),
+    var(--stat-figure-max)
+  );
 }
 [data-artifact-style="riso"] .artifact-stat-unit {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 600;
   color: rgb(var(--art-ink));
 }
 [data-artifact-style="riso"] [data-canvas-artifact] .artifact-stat-unit {
-  font-size: clamp(14px, min(5cqw, 8.5cqh), 34px);
+  font-size: clamp(
+    var(--stat-unit-min),
+    min(var(--stat-unit-cqw), var(--stat-unit-cqh)),
+    var(--stat-unit-max)
+  );
+}
+/* The sentence, not an eyebrow: sentence case, reading weight, second in the
+   stack, and it takes whatever vertical slack is left. */
+[data-artifact-style="riso"] .artifact-stat-label {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.32;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  text-transform: none;
+  color: rgb(var(--canvas-muted));
+}
+[data-artifact-style="riso"] [data-canvas-artifact] .artifact-stat-label {
+  font-size: clamp(15px, min(5.6cqw, 9cqh), 28px);
 }
 [data-artifact-style="riso"] .artifact-stat-delta {
-  font-size: 12px;
+  flex: 0 0 auto;
+  font-size: 13px;
   margin: 0;
   color: rgb(var(--canvas-muted));
 }
@@ -1469,6 +1582,7 @@ html[data-theme="dark"] [data-artifact-style="bento"] {
   color: rgb(var(--canvas-ink));
 }
 [data-artifact-style="riso"] .artifact-stat-attribution {
+  flex: 0 0 auto;
   font-size: 11.5px;
   opacity: 1;
   margin: 0;
@@ -1479,19 +1593,47 @@ html[data-theme="dark"] [data-artifact-style="bento"] {
 
 /* -------------------------------- Quote -------------------------------- */
 
-/* A hanging opening mark on the first line, the line itself set heavy and
-   balanced, attribution behind a dash. The mark is inline (line-height 0)
-   so the text never has to clear a floating glyph — spacing stays even at
-   every card size. */
+/* The mark is the picture. One oversized opening quote sits in the dead space
+   at the top right and runs off the card edge — the stage clips it, so it
+   reads as a fragment of something much larger rather than a glyph that
+   happens to be big. The line is set heavy and balanced beneath it, with a
+   right inset so the text never collides with the mark; attribution behind a
+   dash. */
 [data-artifact-style="riso"] .artifact-quote {
+  position: relative;
   gap: 12px;
   padding: 20px 22px 18px;
+  overflow: hidden;
+}
+[data-artifact-style="riso"] .artifact-quote::before {
+  content: "\201C";
+  position: absolute;
+  /* The glyph's ink is only ~a quarter of its em box, so the type size runs
+     far past the card and the offsets pull the ink back up against the top
+     right corner. */
+  top: -0.07em;
+  right: -0.14em;
+  z-index: 0;
+  font-family: var(--canvas-artifact-display-family);
+  font-size: 96px;
+  line-height: 1;
+  font-weight: 800;
+  color: rgb(var(--art-vivid) / 0.22);
+  pointer-events: none;
+  user-select: none;
+}
+[data-artifact-style="riso"] [data-canvas-artifact] .artifact-quote::before {
+  font-size: clamp(120px, min(62cqw, 215cqh), 460px);
 }
 [data-artifact-style="riso"] .artifact-quote-rule {
   display: none;
 }
 [data-artifact-style="riso"] .artifact-quote-body {
+  position: relative;
+  z-index: 1;
   padding: 0;
+  /* Clear of the mark's visible stroke, proportional so it holds at any size. */
+  padding-right: 20%;
   font-family: var(--canvas-artifact-display-family);
   font-size: 22px;
   line-height: 1.22;
@@ -1502,20 +1644,14 @@ html[data-theme="dark"] [data-artifact-style="bento"] {
 [data-artifact-style="riso"] [data-canvas-artifact] .artifact-quote-body {
   font-size: clamp(17px, min(6cqw, 13cqh), var(--canvas-artifact-quote-size));
 }
-[data-artifact-style="riso"] .artifact-quote-body::before {
-  content: "\201C";
-  display: inline-block;
-  font-size: 1.9em;
-  line-height: 0;
-  vertical-align: -0.42em;
-  margin-right: 0.06em;
-  font-weight: 800;
-  color: rgb(var(--art-vivid));
-}
+/* The hanging inline mark is gone — the oversized one on the card carries it. */
+[data-artifact-style="riso"] .artifact-quote-body::before,
 [data-artifact-style="riso"] .artifact-quote-body::after {
   content: none;
 }
 [data-artifact-style="riso"] .artifact-quote-caption {
+  position: relative;
+  z-index: 1;
   padding-left: 0;
   font-size: 12px;
   gap: 4px 10px;

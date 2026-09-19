@@ -288,12 +288,20 @@ export async function createCanvas(
   return { id: data.id, state: parsed, updatedAt: data.updated_at };
 }
 
+/** Where a canvas came from, when it started life as someone else's. */
+export interface CanvasLineage {
+  sourceCanvasId?: string;
+  sourcePublishedSlug?: string;
+  sourcePublishedVersion?: number;
+}
+
 /** Insert an already-built snapshot as-is (e.g. a sample-canvas build). */
 export async function createCanvasFromSnapshot(
   supabase: Supabase,
   userId: string,
   title: string,
   snapshot: CanvasSnapshot,
+  lineage?: CanvasLineage,
 ): Promise<CanvasRow> {
   const { data, error } = await supabase
     .from("canvases")
@@ -302,6 +310,9 @@ export async function createCanvasFromSnapshot(
       title,
       state: snapshot as unknown as Database["public"]["Tables"]["canvases"]["Insert"]["state"],
       is_default: false,
+      source_canvas_id: lineage?.sourceCanvasId ?? null,
+      source_published_slug: lineage?.sourcePublishedSlug ?? null,
+      source_published_version: lineage?.sourcePublishedVersion ?? null,
     })
     .select("id, state, updated_at")
     .single();
