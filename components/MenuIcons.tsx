@@ -16,6 +16,7 @@ import {
   Lightbulb,
   MessageCircleQuestionMark,
   MessageSquare,
+  MessagesSquare,
   Paperclip,
   Pencil,
   Plus,
@@ -165,6 +166,10 @@ export function GifIcon() {
 
 export function DocumentIcon() {
   return <Icon icon={FileText} className={DEFAULT_CLASS} />;
+}
+
+export function ChatImportIcon() {
+  return <Icon icon={MessagesSquare} className={DEFAULT_CLASS} />;
 }
 
 export function CodeFileIcon() {

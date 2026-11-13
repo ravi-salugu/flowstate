@@ -138,6 +138,32 @@ describe("planSpineShifts / planMastheadStack", () => {
     expect(shifts).toEqual({ "x-chapter-2": 160, "x-chapter-3": 620 });
   });
 
+  it("keeps a second spine beside the first, not behind its masthead", () => {
+    // Spine "x" (an earlier import) with its masthead at the far left, then
+    // spine "y" (a later import, no sources so no masthead) placed well to
+    // its right. y must stay put, not slide back after x's masthead.
+    const cards = {
+      a: card("a", 1660, 0, 900),
+      b: card("b", 9647, 0, 400),
+    };
+    const groups = {
+      gx: groupAt(1, "a"),
+      gy: Object.assign(groupAt(1, "b"), { id: "y-chapter-1" }),
+    };
+    const nodes = {
+      xMast: node("xMast", { position: { x: 0, y: 0 }, size: { w: 1400, h: 900 }, layoutSetSize: true }),
+    };
+    const shifts = planSpineShifts({
+      groups: { [groups.gx.id]: groups.gx, [groups.gy.id]: groups.gy },
+      cards,
+      nodes,
+      sessionArtifacts: { xMast: art("xMast", "linkgroup") },
+      mastheadKinds: new Set(["linkgroup"]),
+      gap: 260,
+    });
+    expect(shifts).toEqual({});
+  });
+
   it("restacks the masthead column under a card that grew", () => {
     const nodes = {
       ep: node("ep", { position: { x: -2000, y: 0 }, size: { w: 1400, h: 900 }, layoutSetSize: true }),

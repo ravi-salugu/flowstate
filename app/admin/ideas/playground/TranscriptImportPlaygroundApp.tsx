@@ -13,7 +13,10 @@ import {
   DEFAULT_TRANSCRIPT_IMPORT_CANVAS_ID,
   getTranscriptImportCanvas,
   TRANSCRIPT_IMPORT_CANVASES,
+  type TranscriptImportCanvasDef,
 } from "@/lib/buildTranscriptImportPlaygroundSnapshot";
+import { defineImportedCanvas } from "@/lib/conversationImport/defineImportedCanvas";
+import type { ConversationImportSpec } from "@/lib/conversationImport/spec";
 import { useCanvasStore } from "@/lib/store";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -30,6 +33,15 @@ type PublishState =
   | { status: "published"; title: string }
   | { status: "error"; message: string };
 
+type ImportState =
+  | { status: "idle" }
+  | { status: "importing"; fileName: string }
+  | { status: "error"; message: string };
+
+/** Uploads accepted by "Import .md": chat exports, transcripts, notes. */
+const IMPORT_ACCEPT = ".md,.markdown,.txt,text/markdown,text/plain";
+const MAX_IMPORT_BYTES = 600_000;
+
 export function TranscriptImportPlaygroundApp({
   ideaTitle,
   backHref,
@@ -44,14 +56,23 @@ export function TranscriptImportPlaygroundApp({
   const [activeCanvasId, setActiveCanvasId] = useState(
     DEFAULT_TRANSCRIPT_IMPORT_CANVAS_ID,
   );
+  const [importedCanvases, setImportedCanvases] = useState<
+    TranscriptImportCanvasDef[]
+  >([]);
+  const [importState, setImportState] = useState<ImportState>({
+    status: "idle",
+  });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const activeCanvas =
+    importedCanvases.find((canvas) => canvas.id === activeCanvasId) ??
+    getTranscriptImportCanvas(activeCanvasId);
   const { fitContent } = useTranscriptImportPlaygroundCanvas(
     canvasContainerRef,
-    activeCanvasId,
+    activeCanvas,
   );
   const canvasArtifactStyle = useCanvasStore((st) => st.canvasArtifactStyle);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
 
-  const activeCanvas = getTranscriptImportCanvas(activeCanvasId);
   const [publishState, setPublishState] = useState<PublishState>({
     status: "idle",
   });
@@ -62,6 +83,73 @@ export function TranscriptImportPlaygroundApp({
     setTranscriptOpen(false);
     setPublishState({ status: "idle" });
   };
+
+  // Upload → one metered LLM call → spec → canvas, built client-side with the
+  // same chapter engine as the hand-made transcript canvases.
+  const handleImportFile = async (file: File) => {
+    if (importState.status === "importing") return;
+    if (file.size > MAX_IMPORT_BYTES) {
+      setImportState({
+        status: "error",
+        message: `${file.name} is too large (${Math.round(file.size / 1000)} KB). Consolidate it with the Flowstate prompt first.`,
+      });
+      return;
+    }
+    setImportState({ status: "importing", fileName: file.name });
+    try {
+      const text = await file.text();
+      const res = await fetch("/api/admin/conversation-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, fileName: file.name }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        spec?: ConversationImportSpec;
+        error?: string;
+      };
+      if (!res.ok || !json.spec) {
+        throw new Error(json.error ?? `Import failed (${res.status}).`);
+      }
+      const canvas = defineImportedCanvas(json.spec, text);
+      setImportedCanvases((prev) => [...prev, canvas]);
+      selectCanvas(canvas.id);
+      setImportState({ status: "idle" });
+    } catch (error) {
+      setImportState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Import failed.",
+      });
+    }
+  };
+
+  const importButton = (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={IMPORT_ACCEPT}
+        className="hidden"
+        data-conversation-import-input
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) void handleImportFile(file);
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={importState.status === "importing"}
+        title="Upload a chat consolidated with the Flowstate prompt, or any transcript. Uses Flowstate credits."
+        className="inline-flex items-center gap-1.5 rounded-canvas border border-canvas-border bg-canvas-card px-3 py-1.5 text-canvas-body-sm font-medium text-canvas-ink transition-colors hover:bg-canvas-bg disabled:cursor-wait disabled:opacity-60"
+      >
+        <AdminActionIcon name="transcript" className="h-4 w-4" />
+        {importState.status === "importing"
+          ? `Importing ${importState.fileName}…`
+          : "Import .md"}
+      </button>
+    </>
+  );
 
   const handlePublish = async () => {
     if (publishState.status === "publishing") return;
@@ -140,6 +228,7 @@ export function TranscriptImportPlaygroundApp({
               <AdminActionIcon name="fit-canvas" />
               Fit canvas
             </button>
+            {importButton}
             {publishButton}
             <Link
               href={backHref}
@@ -160,9 +249,27 @@ export function TranscriptImportPlaygroundApp({
             <AdminActionIcon name="fit-canvas" />
             Fit canvas
           </button>
+          {importButton}
           {publishButton}
         </div>
       )}
+
+      {importState.status === "error" ? (
+        <div
+          role="alert"
+          className="flex shrink-0 items-center gap-2 border-b border-canvas-border bg-canvas-card px-4 py-2 text-canvas-body-sm text-canvas-ink sm:px-6"
+        >
+          <AdminActionIcon name="alert" className="h-4 w-4" />
+          <span>{importState.message}</span>
+          <button
+            type="button"
+            onClick={() => setImportState({ status: "idle" })}
+            className="ml-auto text-canvas-micro text-canvas-muted hover:text-canvas-ink"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       {publishState.status === "published" ||
       publishState.status === "error" ? (
@@ -216,7 +323,7 @@ export function TranscriptImportPlaygroundApp({
             <AdminActionIcon name="transcript" className="h-3.5 w-3.5" />
             Canvases
           </span>
-          {TRANSCRIPT_IMPORT_CANVASES.map((canvas) => {
+          {[...importedCanvases, ...TRANSCRIPT_IMPORT_CANVASES].map((canvas) => {
             const active = canvas.id === activeCanvasId;
             return (
               <button
@@ -230,6 +337,9 @@ export function TranscriptImportPlaygroundApp({
                     : "border-canvas-border/80 bg-canvas-card/60 text-canvas-muted hover:bg-canvas-card hover:text-canvas-ink"
                 }`}
               >
+                {canvas.id.startsWith("import-") ? (
+                  <AdminActionIcon name="sparkles" className="h-3 w-3" />
+                ) : null}
                 {canvas.title}
               </button>
             );
@@ -268,7 +378,9 @@ export function TranscriptImportPlaygroundApp({
                   </a>
                 ) : null}
                 <span className="text-canvas-micro text-canvas-muted">
-                  Pasted text · demo
+                  {activeCanvas.id.startsWith("import-")
+                    ? "Uploaded file · metered import"
+                    : "Pasted text · demo"}
                 </span>
                 <button
                   type="button"

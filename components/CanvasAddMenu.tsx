@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { GifIcon, ImageIcon, Model3DIcon, DocumentIcon, CodeFileIcon } from "@/components/MenuIcons";
+import { GifIcon, ImageIcon, Model3DIcon, DocumentIcon, CodeFileIcon, ChatImportIcon } from "@/components/MenuIcons";
 import { MotionOverlayPopover } from "@/components/motion/MotionOverlay";
 import { useToolbarPopoverAnchor } from "@/hooks/useToolbarPopoverAnchor";
 
@@ -15,6 +15,8 @@ interface Props {
   onAddDocument: () => void;
   onAddCodeFile: () => void;
   onAddGifs: () => void;
+  /** Upload a consolidated chat / transcript; it lands beside the existing work. */
+  onImportChat: () => void;
   disabled?: boolean;
 }
 
@@ -31,6 +33,7 @@ export function CanvasAddMenu({
   onAddDocument,
   onAddCodeFile,
   onAddGifs,
+  onImportChat,
   disabled,
 }: Props) {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -139,6 +142,22 @@ export function CanvasAddMenu({
             <GifIcon />
           </span>
           GIFs
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          disabled={disabled}
+          className={menuBtn}
+          title="Upload a chat consolidated with the Flowstate prompt, or a transcript (.md / .txt)"
+          onClick={() => {
+            onImportChat();
+            onClose();
+          }}
+        >
+          <span className="text-canvas-muted">
+            <ChatImportIcon />
+          </span>
+          Import a chat
         </button>
       </div>
     </MotionOverlayPopover>

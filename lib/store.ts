@@ -51,6 +51,7 @@ import { THREAD_ACCENT_PALETTE } from "@/lib/design/tokens";
 import type { ModelId } from "@/lib/models";
 import {
   DEFAULT_ARTIFACT_STYLE_ID,
+  NEW_CANVAS_ARTIFACT_STYLE_ID,
   getArtifactStylePack,
 } from "@/lib/design/style/stylePacks";
 import type { ArtifactStyleId } from "@/lib/design/style/types";
@@ -2725,7 +2726,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   canvasBackgroundStyle: "grid",
   canvasBackgroundImageId: DEFAULT_CANVAS_BACKGROUND_IMAGE_ID,
   canvasTheme: "light",
-  canvasArtifactStyle: DEFAULT_ARTIFACT_STYLE_ID,
+  canvasArtifactStyle: NEW_CANVAS_ARTIFACT_STYLE_ID,
   canvasPreviewBodyFontId: DEFAULT_BODY_FONT_ID,
   canvasPreviewDisplayFontId: "denton",
   globalOrigin: null,

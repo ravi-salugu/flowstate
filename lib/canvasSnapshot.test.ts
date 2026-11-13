@@ -28,6 +28,10 @@ describe("normalizeCanvasSnapshot", () => {
     expect(snapshot.canvasBackgroundStyle).toBe("grid");
   });
 
+  it("starts new empty canvases in frost", () => {
+    expect(buildEmptyCanvasSnapshot().canvasArtifactStyle).toBe("frost");
+  });
+
   it("defaults canvasArtifactStyle to vanilla for legacy snapshots", () => {
     const snapshot = normalizeCanvasSnapshot({ version: 1 });
     expect(snapshot.canvasArtifactStyle).toBe("vanilla");

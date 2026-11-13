@@ -14,6 +14,13 @@ import type { ArtifactCategoryId } from "@/lib/design/theme/types";
 export const DEFAULT_ARTIFACT_STYLE_ID = "vanilla";
 
 /**
+ * The pack every newly created canvas starts in — blank canvases, guests'
+ * first canvas, and playground imports. Distinct from the vanilla baseline
+ * above, which stays the fallback for legacy snapshots saved without a style.
+ */
+export const NEW_CANVAS_ARTIFACT_STYLE_ID = "frost";
+
+/**
  * Vanilla documents the current factory look (ground truth for a future
  * full-token refactor). It is never resolved into CSS — the resolver
  * short-circuits so vanilla stays a structural no-op.

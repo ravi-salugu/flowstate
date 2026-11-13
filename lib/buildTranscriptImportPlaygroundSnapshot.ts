@@ -4,6 +4,7 @@ import {
   buildCanvasSnapshot,
   type CanvasSnapshot,
 } from "@/lib/canvasSnapshot";
+import { NEW_CANVAS_ARTIFACT_STYLE_ID } from "@/lib/design/style/stylePacks";
 import { buildDesignToolsCanvasSection } from "@/lib/transcriptImport/buildDesignToolsCanvasSection";
 import { buildYcInterviewCanvasSection } from "@/lib/transcriptImport/buildYcInterviewCanvasSection";
 import { buildHubermanCanvasSection } from "@/lib/transcriptImport/buildHubermanCanvasSection";
@@ -162,7 +163,7 @@ function snapshotFromSection(
     connectorStyle: "orthogonal",
     canvasBackgroundStyle: "grid",
     canvasTheme: "light",
-    canvasArtifactStyle: "vanilla",
+    canvasArtifactStyle: NEW_CANVAS_ARTIFACT_STYLE_ID,
     selectedModel: "claude-sonnet-4-6",
     viewMode: "canvas",
     sessionArtifacts: section.sessionArtifacts,
@@ -178,7 +179,7 @@ function snapshotFromSection(
   });
 }
 
-function defineCanvas(
+export function defineCanvas(
   id: string,
   title: string,
   transcript: string,

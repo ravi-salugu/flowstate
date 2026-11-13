@@ -5,6 +5,11 @@ import { useAuth } from "@/components/AuthProvider";
 import { CanvasGridCard } from "@/components/home/CanvasGridCard";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { NewCanvasCard } from "@/components/home/NewCanvasCard";
+import { ImportChatCard } from "@/components/home/ImportChatCard";
+import { showAppErrorToast } from "@/lib/appToastStore";
+import { dedupeTitle } from "@/lib/canvasTitles";
+import { createCanvasFromSnapshot } from "@/lib/canvasPersistence";
+import { createClient } from "@/lib/supabase/client";
 import { PaginatedGrid, type GridSlot } from "@/components/home/PaginatedGrid";
 import { SectionHeading } from "@/components/home/SectionHeading";
 import { useCanvasSnapshotThumbnailUrls } from "@/components/home/useCanvasSnapshotThumbnailUrls";
@@ -27,9 +32,11 @@ export function HomeView({ onOpenCanvas }: { onOpenCanvas: () => void }) {
     switchingCanvasId,
     switchCanvas,
     createNewCanvas,
+    refreshCanvasList,
   } = useAuth();
 
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement | null>(null);
   const searching = query.trim().length > 0;
@@ -111,6 +118,45 @@ export function HomeView({ onOpenCanvas }: { onOpenCanvas: () => void }) {
     }
   }, [createNewCanvas, creating, isSwitchingCanvas, onOpenCanvas]);
 
+  // Upload a consolidated chat → one metered LLM call → a new canvas holding
+  // just the import, opened straight away.
+  const handleImportChat = useCallback(
+    async (file: File) => {
+      if (!user || importing || isSwitchingCanvas) return;
+      setImporting(true);
+      try {
+        const { requestConversationImport, snapshotForImport } = await import(
+          "@/lib/conversationImport/client"
+        );
+        const result = await requestConversationImport(file);
+        if (!result.ok) {
+          if (result.error) showAppErrorToast(result.error);
+          return;
+        }
+        const title = dedupeTitle(
+          result.spec.title,
+          canvases.map((c) => c.title),
+        );
+        const created = await createCanvasFromSnapshot(
+          createClient(),
+          user.id,
+          title,
+          snapshotForImport(result.spec),
+        );
+        // Inserted directly, so the provider's list doesn't know it yet.
+        await refreshCanvasList();
+        await handleOpen(created.id);
+      } catch (error) {
+        showAppErrorToast(
+          error instanceof Error ? error.message : "Couldn't create the canvas.",
+        );
+      } finally {
+        setImporting(false);
+      }
+    },
+    [canvases, handleOpen, importing, isSwitchingCanvas, refreshCanvasList, user],
+  );
+
   const loading = supabaseConfigured && persistenceStatus !== "ready";
 
   const yourCanvasSlots: GridSlot[] = [
@@ -126,6 +172,16 @@ export function HomeView({ onOpenCanvas }: { onOpenCanvas: () => void }) {
                 disabled={!supabaseConfigured || isSwitchingCanvas}
                 busy={creating}
                 onCreate={() => void handleCreate()}
+              />
+            ),
+          },
+          {
+            key: "import-chat",
+            node: (
+              <ImportChatCard
+                disabled={!supabaseConfigured || !user || isSwitchingCanvas}
+                busy={importing}
+                onFile={(file) => void handleImportChat(file)}
               />
             ),
           },

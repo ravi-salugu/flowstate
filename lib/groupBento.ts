@@ -335,11 +335,23 @@ export function planSpineShifts(input: SpineInput): Record<string, number> {
   }
 
   const shifts: Record<string, number> = {};
-  for (const list of spines.values()) {
+  for (const [prefix, list] of spines) {
     list.sort((a, b) => a.n - b.n);
     let prevRight: number | null = null;
     const first = groupExtent(list[0]!.group, input);
     if (first) {
+      // A canvas can hold several spines (two imports side by side). This
+      // spine's masthead sits between chapter 1 and whatever group lies to its
+      // left — never behind another spine's chapters, or chapter 1 would slide
+      // back to sit one gap after THAT canvas's masthead, on top of its work.
+      let barrier = -Infinity;
+      for (const group of Object.values(input.groups)) {
+        if (CHAPTER_ID.exec(group.id)?.[1] === prefix) continue;
+        const extent = groupExtent(group, input);
+        if (extent && extent.right <= first.left) {
+          barrier = Math.max(barrier, extent.right);
+        }
+      }
       // The masthead: ungrouped masthead-kind nodes to the left of chapter 1
       // and level with it.
       for (const node of Object.values(input.nodes)) {
@@ -349,6 +361,7 @@ export function planSpineShifts(input: SpineInput): Record<string, number> {
         if (!input.mastheadKinds.has(artifact.kind) && !node.mastheadScale) continue;
         const { w, h } = getArtifactBounds(node, artifact);
         if (node.position.x >= first.left) continue;
+        if (node.position.x < barrier) continue;
         if (node.position.y > first.bottom || node.position.y + h < first.top - 2000) continue;
         prevRight = Math.max(prevRight ?? -Infinity, node.position.x + w);
       }

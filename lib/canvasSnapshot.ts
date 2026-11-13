@@ -4,6 +4,7 @@ import { resolveBackgroundForTheme } from "@/lib/canvasBackgroundTheme";
 import { isKnownModel } from "@/lib/models";
 import {
   DEFAULT_ARTIFACT_STYLE_ID,
+  NEW_CANVAS_ARTIFACT_STYLE_ID,
   getArtifactStylePack,
 } from "@/lib/design/style/stylePacks";
 import type { ArtifactStyleId } from "@/lib/design/style/types";
@@ -443,7 +444,7 @@ export function buildEmptyCanvasSnapshot(
     canvasBackgroundStyle: "grid",
     canvasBackgroundImageId: DEFAULT_CANVAS_BACKGROUND_IMAGE_ID,
     canvasTheme: "light",
-    canvasArtifactStyle: DEFAULT_ARTIFACT_STYLE_ID,
+    canvasArtifactStyle: NEW_CANVAS_ARTIFACT_STYLE_ID,
     selectedModel,
     viewMode: "canvas",
     sessionArtifacts: {},

@@ -8,7 +8,8 @@ export type Surface =
   | "memory-extract"
   | "skills-analyze"
   | "github-summary"
-  | "github-summary-stream";
+  | "github-summary-stream"
+  | "conversation-import";
 
 export type PlanId = "free" | "pro" | "max";
 

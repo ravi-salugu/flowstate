@@ -17,6 +17,7 @@ import { uploadAssetFiles, type AssetUploadError, DOCUMENT_FILE_ACCEPT, CODE_FIL
 import { showUploadErrorsToast } from "@/lib/uploadErrorToast";
 import { useClientMounted } from "@/hooks/useClientMounted";
 import { useCanvasStore } from "@/lib/store";
+import { showAppErrorToast, showAppToast } from "@/lib/appToastStore";
 
 import { iconToggleBtn, toolbarBtn } from "@/components/toolbarButtonClasses";
 
@@ -30,6 +31,8 @@ export function CanvasBottomToolbar() {
   const documentInputRef = useRef<HTMLInputElement>(null);
   const codeFileInputRef = useRef<HTMLInputElement>(null);
   const model3dInputRef = useRef<HTMLInputElement>(null);
+  const chatImportInputRef = useRef<HTMLInputElement>(null);
+  const [importingChat, setImportingChat] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [artifactMenuOpen, setArtifactMenuOpen] = useState(false);
   const [pencilOpen, setPencilOpen] = useState(false);
@@ -109,6 +112,35 @@ export function CanvasBottomToolbar() {
     if (codeAsset) requestImagePlacement(codeAsset.id);
     if (result.errors.length > 0) {
       showUploadErrorsToast(result.errors);
+    }
+  };
+
+  // "Continue on Flowstate": a consolidated chat or transcript becomes its own
+  // section of this canvas, to the right of whatever is already here.
+  const handleChatImportFiles = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file || !canEdit || importingChat) return;
+    setImportingChat(true);
+    showAppToast(`Importing ${file.name}…`);
+    try {
+      // Loaded on demand: the chapter engine stays out of the toolbar bundle.
+      const { requestConversationImport, importIntoActiveCanvas } = await import(
+        "@/lib/conversationImport/client"
+      );
+      const result = await requestConversationImport(file);
+      if (!result.ok) {
+        if (result.error) showAppErrorToast(result.error);
+        return;
+      }
+      if (importIntoActiveCanvas(result.spec)) {
+        showAppToast(
+          result.truncated
+            ? `Imported “${result.spec.title}” — the file was long, so the end may be missing`
+            : `Imported “${result.spec.title}”`,
+        );
+      }
+    } finally {
+      setImportingChat(false);
     }
   };
 
@@ -194,6 +226,17 @@ export function CanvasBottomToolbar() {
           e.target.value = "";
         }}
       />
+      <input
+        ref={chatImportInputRef}
+        type="file"
+        accept=".md,.markdown,.txt,text/markdown,text/plain"
+        className="hidden"
+        data-chat-import-input
+        onChange={(e) => {
+          void handleChatImportFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
       <div ref={toolbarShellRef} className="relative">
         <CanvasAddMenu
           open={addMenuOpen}
@@ -205,6 +248,7 @@ export function CanvasBottomToolbar() {
           onAdd3DModel={() => model3dInputRef.current?.click()}
           onAddDocument={() => documentInputRef.current?.click()}
           onAddCodeFile={() => codeFileInputRef.current?.click()}
+          onImportChat={() => chatImportInputRef.current?.click()}
           onAddGifs={() => {
             setAddMenuOpen(false);
             setGifPickerOpen(true);

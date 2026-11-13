@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { buildCanvasSnapshot } from "@/lib/canvasSnapshot";
-import { getTranscriptImportCanvas } from "@/lib/buildTranscriptImportPlaygroundSnapshot";
+import type { TranscriptImportCanvasDef } from "@/lib/buildTranscriptImportPlaygroundSnapshot";
 import {
   beginTranscriptImportPlaygroundSession,
   endTranscriptImportPlaygroundSession,
@@ -18,7 +18,7 @@ import { useCanvasStore } from "@/lib/store";
 
 function fitViewportToImport(
   container: HTMLElement,
-  canvasId: string,
+  canvas: TranscriptImportCanvasDef,
   padding = 200,
 ): void {
   const state = useCanvasStore.getState();
@@ -41,7 +41,7 @@ function fitViewportToImport(
 
   const { width, height } = container.getBoundingClientRect();
   if (rects.length === 0) {
-    const center = getTranscriptImportCanvas(canvasId).contentCenter();
+    const center = canvas.contentCenter();
     state.setViewport(
       viewportCenteredOnWorldPoint(center.x, center.y, width, height, 0.55),
     );
@@ -74,7 +74,7 @@ function fitViewportToImport(
 
 export function useTranscriptImportPlaygroundCanvas(
   containerRef: React.RefObject<HTMLElement | null>,
-  canvasId: string,
+  canvas: TranscriptImportCanvasDef,
 ) {
   const persistenceReady = usePersistenceReady();
   const hydrateFromSnapshot = useCanvasStore((s) => s.hydrateFromSnapshot);
@@ -83,8 +83,8 @@ export function useTranscriptImportPlaygroundCanvas(
   const fitContent = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
-    fitViewportToImport(el, canvasId);
-  }, [containerRef, canvasId]);
+    fitViewportToImport(el, canvas);
+  }, [containerRef, canvas]);
 
   // The user's real canvas is stashed once for the whole visit and restored on
   // the way out — switching between imported canvases must not touch it.
@@ -110,17 +110,14 @@ export function useTranscriptImportPlaygroundCanvas(
   useEffect(() => {
     if (!persistenceReady) return;
     resetViewportBootstrap();
-    hydrateFromSnapshot(
-      getTranscriptImportCanvas(canvasId).buildSnapshot(),
-      { applyViewport: false },
-    );
+    hydrateFromSnapshot(canvas.buildSnapshot(), { applyViewport: false });
 
     requestAnimationFrame(() => {
       if (containerRef.current) {
-        fitViewportToImport(containerRef.current, canvasId);
+        fitViewportToImport(containerRef.current, canvas);
       }
     });
-  }, [persistenceReady, canvasId, hydrateFromSnapshot, containerRef]);
+  }, [persistenceReady, canvas, hydrateFromSnapshot, containerRef]);
 
   return { fitContent };
 }
