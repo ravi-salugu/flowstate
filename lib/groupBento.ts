@@ -366,9 +366,15 @@ export function planSpineShifts(input: SpineInput): Record<string, number> {
         prevRight = Math.max(prevRight ?? -Infinity, node.position.x + w);
       }
     }
+    // Chapters arranged in rows (Arrange in 3 rows) keep one spine per row:
+    // a chapter wholly below the one before it starts a new row and keeps
+    // its own x, instead of being pulled to the end of the row above.
+    let prevExtent: { top: number; bottom: number } | null = null;
     for (const { group } of list) {
       const extent = groupExtent(group, input);
       if (!extent) continue;
+      if (prevExtent && extent.top >= prevExtent.bottom) prevRight = null;
+      prevExtent = extent;
       let dx = 0;
       if (prevRight !== null) dx = prevRight + input.gap - extent.left;
       if (Math.abs(dx) > 0.5) shifts[group.id] = Math.round(dx);

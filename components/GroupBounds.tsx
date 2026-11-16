@@ -41,7 +41,9 @@ const CORNER_RADIUS = `calc(var(--canvas-radius-lg) + ${GROUP_BOUNDS_PADDING}px)
  */
 function GroupBoundsInner({ group }: GroupBoundsProps) {
   const bounds = useGroupBounds(group);
-  const isActive = useCanvasStore((s) => s.activeGroupId === group.id);
+  const isActive = useCanvasStore(
+    (s) => s.activeGroupId === group.id || s.selectedGroupIds.includes(group.id),
+  );
   const canvasReadOnly = useCanvasStore((s) => s.canvasReadOnly);
   const setActiveGroupId = useCanvasStore((s) => s.setActiveGroupId);
   const clearSelection = useCanvasStore((s) => s.clearSelection);
@@ -60,12 +62,26 @@ function GroupBoundsInner({ group }: GroupBoundsProps) {
   // Label drag moves the whole group; refs resolve at drag start so members
   // added after mount are included. The commit always goes through
   // moveGroupBy.
+  // When this group is part of a multi-group selection, the drag carries
+  // every selected group; otherwise just this one.
+  const draggedGroupIds = (): string[] => {
+    const st = useCanvasStore.getState();
+    return st.selectedGroupIds.includes(group.id)
+      ? st.selectedGroupIds.filter((id) => st.groups[id])
+      : [group.id];
+  };
   const nodeDrag = useCanvasNodeDrag({
     kind: "group",
     nodeId: group.id,
-    resolveRefs: () =>
-      groupGestureRefs(useCanvasStore.getState(), group),
-    commitMove: (_id, dx, dy) => moveGroupBy(group.id, dx, dy),
+    resolveRefs: () => {
+      const st = useCanvasStore.getState();
+      return draggedGroupIds().flatMap((id) =>
+        groupGestureRefs(st, st.groups[id] ?? group),
+      );
+    },
+    commitMove: (_id, dx, dy) => {
+      for (const id of draggedGroupIds()) moveGroupBy(id, dx, dy);
+    },
   });
 
   if (!bounds) return null;
@@ -74,6 +90,17 @@ function GroupBoundsInner({ group }: GroupBoundsProps) {
     if (e.button !== 0 || editing) return;
     e.stopPropagation();
     e.preventDefault();
+    const st = useCanvasStore.getState();
+    // Shift/Cmd/Ctrl-click adds or removes this chapter from the selection.
+    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+      st.toggleGroupInSelection(group.id);
+      return;
+    }
+    // Grabbing one of several selected chapters drags them all.
+    if (st.selectedGroupIds.length > 1 && st.selectedGroupIds.includes(group.id)) {
+      if (!canvasReadOnly) nodeDrag.start(e, { moveSelection: false });
+      return;
+    }
     // Activating the group clears any node selection (section semantics).
     clearSelection();
     setActiveGroupId(group.id);

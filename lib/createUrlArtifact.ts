@@ -114,6 +114,41 @@ async function persistPreviewImage(
   }
 }
 
+const healAttempted = new Set<string>();
+
+/**
+ * Re-resolve a website card whose stored preview image no longer loads.
+ *
+ * Canvases built offline (the transcript and conversation imports) bake a
+ * preview path such as /transcript-import/previews/<hash>.jpg into the
+ * payload. When those bytes never shipped with the deploy, every viewer gets a
+ * broken image forever. This asks /api/link-preview for the site's real hero
+ * once per artifact per session, patches the card, and copies the image into
+ * the canvas's own assets so the fix sticks for everyone.
+ *
+ * Resolves to the new image URL, or null when the site offers none.
+ */
+export async function healWebsitePreview(
+  artifactId: string,
+  url: string,
+  brokenPreviewUrl: string | undefined,
+): Promise<string | null> {
+  if (healAttempted.has(artifactId)) return null;
+  healAttempted.add(artifactId);
+  const preview = await fetchLinkPreviewClient(url);
+  const next = preview?.previewImageUrl;
+  if (!next || next === brokenPreviewUrl) return null;
+  const current = useCanvasStore.getState().sessionArtifacts[artifactId];
+  if (!current) return null;
+  useCanvasStore.getState().patchWebsiteArtifactTitle(artifactId, {
+    title: current.title,
+    faviconUrl: preview.faviconUrl,
+    previewImageUrl: next,
+  });
+  void persistPreviewImage(artifactId, next);
+  return next;
+}
+
 function enrichWebsiteTitle(artifactId: string, url: string): void {
   // While this runs the card is genuinely "pending" and keeps its default box;
   // once it ends, an unresolved site is final and sizes as a favicon card.

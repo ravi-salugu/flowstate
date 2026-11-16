@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CurrentBody } from "../current";
+import { useWebsitePreview } from "../useWebsitePreview";
 import type { ArtifactRenderContext } from "../types";
 import { GALLERY_VISIBLE, ROLE } from "../textSpec";
 import { D, inkA, DISPLAY, FONT, GLASS, MEDIA_INSET, MEDIA_RADIUS, PAD, Sub, Title, TitleBlock, sentenceCase, sizeFor, splitTitle, useOn } from "./tokens";
@@ -320,7 +321,11 @@ export function AudioBody({ ctx }: Ctx) {
 
 export function WebsiteBody({ ctx }: Ctx) {
   const payload = ctx.item.payload;
-  if (payload.type !== "website" || !payload.data.previewImageUrl) return <InsetBody ctx={ctx} />;
+  const site = payload.type === "website" ? payload.data : null;
+  const preview = useWebsitePreview(ctx.item.artifact.id, site?.url ?? "", site?.previewImageUrl);
+  if (payload.type !== "website" || !payload.data.previewImageUrl || preview.failed) {
+    return <InsetBody ctx={ctx} />;
+  }
   const d = payload.data;
   // The title as written — even when it repeats the domain.
   const title = ctx.item.artifact.title;
@@ -343,7 +348,7 @@ export function WebsiteBody({ ctx }: Ctx) {
       <Well>
         <a href={ctx.interactive ? d.url : undefined} target="_blank" rel="noreferrer" className="absolute inset-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={d.previewImageUrl} alt="" className="h-full w-full object-cover object-top" />
+          <img src={d.previewImageUrl} alt="" onError={preview.onError} className="h-full w-full object-cover object-top" />
         </a>
       </Well>
     </div>

@@ -871,6 +871,30 @@ export function Canvas({
     }
   }, [placement, artifactPlacement, textPlacement, imagePlacement, gifPlacement, threeDPlacement]);
 
+  // Cmd/Ctrl+A selects every chapter (group) on a canvas that has them, so a
+  // whole chapter grid can be dragged as one. Text fields keep their own
+  // select-all.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      if (e.key.toLowerCase() !== "a") return;
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable) {
+          return;
+        }
+      }
+      const st = useCanvasStore.getState();
+      const groupIds = Object.keys(st.groups);
+      if (groupIds.length < 2) return;
+      e.preventDefault();
+      st.setSelectedGroupIds(groupIds);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code !== "Space" || e.repeat) return;

@@ -46,6 +46,7 @@ import {
 } from "@/lib/canvasLayout";
 import { DEFAULT_BODY_FONT_ID } from "@/lib/canvasFonts/registry";
 import { computeGroupBounds } from "@/lib/groupBounds";
+import { planGroupGrid, type GroupBox } from "@/lib/arrangeGroupsGrid";
 import type { CustomUiSourceData } from "@/lib/customUiSource";
 import { THREAD_ACCENT_PALETTE } from "@/lib/design/tokens";
 import type { ModelId } from "@/lib/models";
@@ -999,6 +1000,17 @@ interface CanvasState {
   raiseCanvasNodes: (ids: string[]) => void;
   groups: Record<string, BranchGroup>;
   activeGroupId: string | null;
+  /**
+   * Chapters picked together (Shift/Cmd-click a label, or Cmd+A). Empty unless
+   * two or more groups are selected; dragging any of them moves them all.
+   */
+  selectedGroupIds: string[];
+  /** Add or remove one group from the multi-group selection. */
+  toggleGroupInSelection: (groupId: string) => void;
+  /** Replace the multi-group selection (Cmd+A selects every group). */
+  setSelectedGroupIds: (groupIds: string[]) => void;
+  /** Reflow groups into a grid of `rows` rows, in reading order (one undo step). */
+  arrangeGroupsInGrid: (groupIds: string[], rows: number) => void;
 
   setSelectedFamilyRootIds: (rootThreadIds: string[]) => void;
   /** Replace the unified selection (marquee result). */
@@ -1728,7 +1740,7 @@ function unifiedSelectionPatch(selection: CanvasSelection) {
     // Selecting anything else deactivates the active group (Figma-section
     // behavior); empty patches leave it alone so group creation — which
     // clears the selection and activates the new group — is not undone.
-    ...(hasSelection ? { activeGroupId: null } : {}),
+    ...(hasSelection ? { activeGroupId: null, selectedGroupIds: [] } : {}),
   };
 }
 
@@ -2775,6 +2787,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   raisedNodeIds: [],
   groups: {},
   activeGroupId: null,
+  selectedGroupIds: [],
 
   raiseCanvasNodes: (ids) =>
     set((state) => {
@@ -2820,6 +2833,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
           chatsGloballyHidden: true,
           selectedFamilyRootIds: [],
           activeGroupId: null,
+          selectedGroupIds: [],
         };
       }
       return { chatsGloballyHidden: false };
@@ -2836,6 +2850,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       selectedCanvas3DId: null,
       selectedCanvasSkillId: null,
       activeGroupId: null,
+      selectedGroupIds: [],
     }),
 
   removeSelectedFromCanvas: () =>
@@ -3676,6 +3691,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         groups: next,
         activeGroupId:
           state.activeGroupId === groupId ? null : state.activeGroupId,
+        selectedGroupIds: state.selectedGroupIds.filter((id) => id !== groupId),
         openGroupArtifactId:
           state.openGroupArtifactId === groupId
             ? null
@@ -3687,7 +3703,61 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       };
     }),
 
-  setActiveGroupId: (groupId) => set({ activeGroupId: groupId }),
+  setActiveGroupId: (groupId) =>
+    set({ activeGroupId: groupId, selectedGroupIds: [] }),
+
+  toggleGroupInSelection: (groupId) =>
+    set((state) => {
+      if (!state.groups[groupId]) return state;
+      // The single active group is the seed of a multi-group selection.
+      const base =
+        state.selectedGroupIds.length > 0
+          ? state.selectedGroupIds
+          : state.activeGroupId
+            ? [state.activeGroupId]
+            : [];
+      const next = base.includes(groupId)
+        ? base.filter((id) => id !== groupId)
+        : [...base, groupId];
+      if (next.length <= 1) {
+        return { activeGroupId: next[0] ?? null, selectedGroupIds: [] };
+      }
+      return {
+        activeGroupId: groupId,
+        selectedGroupIds: next,
+        ...unifiedSelectionPatch({ familyRootIds: [], items: [] }),
+      };
+    }),
+
+  arrangeGroupsInGrid: (groupIds, rows) => {
+    const state = get();
+    if (state.canvasReadOnly) return;
+    const boxes: GroupBox[] = [];
+    for (const id of groupIds) {
+      const group = state.groups[id];
+      const b = group ? computeGroupBounds(state, group) : null;
+      if (b) boxes.push({ id, ...b });
+    }
+    const moves = planGroupGrid(boxes, rows).filter(
+      (m) => Math.abs(m.dx) > 0.5 || Math.abs(m.dy) > 0.5,
+    );
+    if (moves.length === 0) return;
+    state.recordUndo();
+    for (const m of moves) get().moveGroupBy(m.id, m.dx, m.dy);
+  },
+
+  setSelectedGroupIds: (groupIds) =>
+    set((state) => {
+      const valid = groupIds.filter((id) => state.groups[id]);
+      if (valid.length <= 1) {
+        return { activeGroupId: valid[0] ?? null, selectedGroupIds: [] };
+      }
+      return {
+        activeGroupId: valid[valid.length - 1]!,
+        selectedGroupIds: valid,
+        ...unifiedSelectionPatch({ familyRootIds: [], items: [] }),
+      };
+    }),
 
   renameGroup: (groupId, label) =>
     set((state) => {
@@ -6357,6 +6427,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       selectedFamilyRootIds: [],
       canvasSelection: [],
       activeGroupId: null,
+      selectedGroupIds: [],
       undoPast: [],
       plugDrag: null,
       plugComposerAttachments: {},
@@ -6516,6 +6587,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         collapsedCardIds: preserveEphemeral ? state.collapsedCardIds : state.collapsedCardIds,
         chatsGloballyHidden: false,
         activeGroupId: preserveEphemeral ? state.activeGroupId : null,
+        selectedGroupIds: preserveEphemeral ? state.selectedGroupIds : [],
         undoPast: preserveEphemeral ? state.undoPast : [],
         globalOrigin,
         uploadedAttachments: JSON.parse(

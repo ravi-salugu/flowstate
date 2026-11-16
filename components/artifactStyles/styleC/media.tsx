@@ -3,6 +3,7 @@
 import { PRIMARY } from "../fonts";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CurrentBody } from "../current";
+import { useWebsitePreview } from "../useWebsitePreview";
 import type { ArtifactRenderContext } from "../types";
 import { GALLERY_VISIBLE, ROLE } from "../textSpec";
 import { C, Display, KICKER_PART, Kicker, NEST_INSET, NEST_RADIUS, PAD, PAD_Y, sentenceCase, sizeFor, splitTitle, tint } from "./tokens";
@@ -273,7 +274,11 @@ export function AudioBody({ ctx }: Ctx) {
 /** The site's name is the kicker, its page title the headline, the preview in the well. */
 export function WebsiteBody({ ctx }: Ctx) {
   const payload = ctx.item.payload;
-  if (payload.type !== "website" || !payload.data.previewImageUrl) return <InsetBody ctx={ctx} />;
+  const site = payload.type === "website" ? payload.data : null;
+  const preview = useWebsitePreview(ctx.item.artifact.id, site?.url ?? "", site?.previewImageUrl);
+  if (payload.type !== "website" || !payload.data.previewImageUrl || preview.failed) {
+    return <InsetBody ctx={ctx} />;
+  }
   const d = payload.data;
   // The title is set as written, even when it repeats the site's name.
   const title = ctx.item.artifact.title;
@@ -295,7 +300,7 @@ export function WebsiteBody({ ctx }: Ctx) {
       <Well>
         <a href={ctx.interactive ? d.url : undefined} target="_blank" rel="noreferrer" className="absolute inset-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={d.previewImageUrl} alt="" className="h-full w-full object-cover object-top" />
+          <img src={d.previewImageUrl} alt="" onError={preview.onError} className="h-full w-full object-cover object-top" />
         </a>
       </Well>
     </div>

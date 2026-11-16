@@ -7,6 +7,7 @@ import { useMediaLoaded } from "@/hooks/useMediaLoaded";
 import { ArtifactTypeIcon } from "@/components/artifacts/ArtifactTypeIcon";
 import { InteractiveWebFrame } from "@/components/artifacts/InteractiveWebFrame";
 import type { ArtifactPayload } from "@/lib/artifactTypes";
+import { healWebsitePreview } from "@/lib/createUrlArtifact";
 import { refreshAssetSignedUrl } from "@/lib/refreshAssetUrl";
 import {
   faviconForUrl,
@@ -210,7 +211,16 @@ export function WebsiteArtifactContent({
       });
       return;
     }
+    // Not an asset (or its re-sign failed): the stored image is gone. Ask the
+    // site for its real hero once; the empty state shows meanwhile.
     setPreviewFailed(true);
+    if (artifactId) {
+      void healWebsitePreview(artifactId, url, previewSrc).then((nextUrl) => {
+        if (!nextUrl) return;
+        setPreviewSrc(nextUrl);
+        setPreviewFailed(false);
+      });
+    }
   };
 
   const showPreview = Boolean(previewSrc) && !previewFailed;

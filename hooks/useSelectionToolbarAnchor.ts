@@ -39,6 +39,7 @@ export function useSelectionWorldBounds(): SelectionUnitBounds | null {
   const selectedFamilyRootIds = useCanvasStore((s) => s.selectedFamilyRootIds);
   const canvasSelection = useCanvasStore((s) => s.canvasSelection);
   const activeGroupId = useCanvasStore((s) => s.activeGroupId);
+  const selectedGroupIds = useCanvasStore((s) => s.selectedGroupIds);
   const groups = useCanvasStore((s) => s.groups);
   const nodesState = useCanvasNodesState();
 
@@ -51,9 +52,28 @@ export function useSelectionWorldBounds(): SelectionUnitBounds | null {
         items: canvasSelection,
       });
     }
+    // Several chapters picked: the union of their frames.
+    if (selectedGroupIds.length > 1) {
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const id of selectedGroupIds) {
+        const group = groups[id];
+        const b = group ? computeGroupBounds(nodesState, group) : null;
+        if (!b) continue;
+        minX = Math.min(minX, b.x);
+        minY = Math.min(minY, b.y);
+        maxX = Math.max(maxX, b.x + b.w);
+        maxY = Math.max(maxY, b.y + b.h);
+      }
+      if (Number.isFinite(minX)) {
+        return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+      }
+    }
     if (activeGroup) {
       return computeGroupBounds(nodesState, activeGroup);
     }
     return null;
-  }, [nodesState, selectedFamilyRootIds, canvasSelection, activeGroup]);
+  }, [nodesState, selectedFamilyRootIds, canvasSelection, activeGroup, selectedGroupIds, groups]);
 }
